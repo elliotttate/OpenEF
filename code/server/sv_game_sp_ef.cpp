@@ -14,12 +14,50 @@ Architecture follows ioEF's sv_game_sp.c pattern.
 #ifdef EF_MODE
 
 #include "server.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "../../codeEF/qcommon/sp_types.h"
 
 // Functions from sv_game.cpp and sv_world.cpp not declared in server.h
 extern void SV_SetBrushModel( gentity_t *ent, const char *name );
 extern void SV_AdjustAreaPortalState( gentity_t *ent, qboolean open );
 extern qboolean SV_EntityContact( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );
+
+// ============================================================================
+// Layer 2: gi.* Call Ring Buffer for crash diagnostics
+// ============================================================================
+
+struct EFCallRecord {
+	const char *func;
+	int entNum;
+	int svTime;
+};
+
+#define EF_CALL_RING_SIZE 200
+static EFCallRecord ef_callRing[EF_CALL_RING_SIZE];
+static int ef_callRingIdx = 0;
+
+void EF_LogCall( const char *func, int ent ) {
+	EFCallRecord &r = ef_callRing[ef_callRingIdx % EF_CALL_RING_SIZE];
+	r.func = func;
+	r.entNum = ent;
+	r.svTime = sv.time;
+	ef_callRingIdx++;
+}
+
+// Dump last N calls to console (called from crash handler or debug)
+void EF_DumpCallRing( int count ) {
+	if ( count <= 0 || count > EF_CALL_RING_SIZE ) count = 30;
+	int start = ef_callRingIdx - count;
+	if ( start < 0 ) start = 0;
+	Com_Printf( "===== EF Call Ring (last %d of %d) =====\n", count, ef_callRingIdx );
+	for ( int i = start; i < ef_callRingIdx; i++ ) {
+		EFCallRecord &r = ef_callRing[i % EF_CALL_RING_SIZE];
+		Com_Printf( "  [%d] %s ent=%d time=%d\n", i, r.func ? r.func : "?", r.entNum, r.svTime );
+	}
+	Com_Printf( "===== End Call Ring =====\n" );
+}
 
 // ============================================================================
 // Shadow arrays -- engine reads these instead of the game DLL's entities
@@ -141,9 +179,20 @@ void SV_EF_SyncAllEntities( void ) {
 	if ( count > MAX_GENTITIES ) count = MAX_GENTITIES;
 	for ( int i = 0; i < count; i++ ) {
 		sp_gentity_t *sp = SV_EF_GetSPEntity( i );
+#ifdef _WIN32
+		__try {
+			if ( sp && sp->inuse ) {
+				SV_EF_SyncToShared( i );
+			}
+		} __except(EXCEPTION_EXECUTE_HANDLER) {
+			Com_DPrintf( S_COLOR_YELLOW "SV_EF_SyncAllEntities: exception syncing entity %d, skipping\n", i );
+			sv_ef_entities[i].inuse = qfalse;
+		}
+#else
 		if ( sp && sp->inuse ) {
 			SV_EF_SyncToShared( i );
 		}
+#endif
 	}
 }
 
@@ -257,12 +306,16 @@ void SV_EF_InitShadowEntities( void ) {
 
 void SV_EF_LinkEntity( sp_gentity_t *sp_ent ) {
 	SV_EF_EnsureInit();
-	if ( !sv_ef_initialized ) return; // ge not ready yet
+	if ( !sv_ef_initialized ) return;
 	int entNum = sp_ent->s.number;
 	if ( entNum < 0 || entNum >= MAX_GENTITIES ) return;
+	EF_LogCall( "linkentity", entNum );
 	SV_EF_SyncToShared( entNum );
 	SV_LinkEntity( &sv_ef_entities[entNum] );
-	SV_EF_SyncFromShared( entNum );
+	// Sync back engine-computed fields (absmin, absmax, linked)
+	sp_ent->linked = sv_ef_entities[entNum].linked;
+	VectorCopy( sv_ef_entities[entNum].absmin, sp_ent->absmin );
+	VectorCopy( sv_ef_entities[entNum].absmax, sp_ent->absmax );
 }
 
 void SV_EF_UnlinkEntity( sp_gentity_t *sp_ent ) {
@@ -270,6 +323,7 @@ void SV_EF_UnlinkEntity( sp_gentity_t *sp_ent ) {
 	if ( !sv_ef_initialized ) return;
 	int entNum = sp_ent->s.number;
 	if ( entNum < 0 || entNum >= MAX_GENTITIES ) return;
+	EF_LogCall( "unlinkentity", entNum );
 	SV_EF_SyncToShared( entNum );
 	SV_UnlinkEntity( &sv_ef_entities[entNum] );
 	SV_EF_SyncFromShared( entNum );
@@ -280,6 +334,7 @@ void SV_EF_SetBrushModel( sp_gentity_t *sp_ent, const char *name ) {
 	if ( !sv_ef_initialized ) return;
 	int entNum = sp_ent->s.number;
 	if ( entNum < 0 || entNum >= MAX_GENTITIES ) return;
+	EF_LogCall( "SetBrushModel", entNum );
 	SV_EF_SyncToShared( entNum );
 	SV_SetBrushModel( &sv_ef_entities[entNum], name );
 	SV_EF_SyncFromShared( entNum );

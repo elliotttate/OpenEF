@@ -23,6 +23,10 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #include "../server/exe_headers.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "../client/snd_music.h"	// didn't want to put this in snd_local because of rebuild times etc.
 #include "server.h"
 
@@ -286,7 +290,9 @@ void SV_SpawnServer( const char *server, ForceReload_e eForceReload, qboolean bA
 	}
 
 	sv.time = 1000;
-	re.G2API_SetTime(sv.time,G2T_SV_TIME);
+	#ifndef EF_MODE
+		re.G2API_SetTime(sv.time,G2T_SV_TIME);
+#endif
 
 	CM_LoadMap( va("maps/%s.bsp", server), qfalse, &checksum, qfalse );
 
@@ -317,13 +323,29 @@ void SV_SpawnServer( const char *server, ForceReload_e eForceReload, qboolean bA
 	Com_Printf("SV: Starting settle frames\n");
 	// run a few frames to allow everything to settle
 	for ( i = 0 ;i < 4 ; i++ ) {
-		Com_Printf("SV: Settle frame %d\n", i);
+		Com_Printf("SV: Settle frame %d (sv.time=%d)\n", i, sv.time);
 #ifdef EF_MODE
 		SV_EF_SyncAllEntities();
 #endif
+
+#if defined(EF_MODE) && defined(_WIN32)
+		// Catch segfaults during RunFrame to get diagnostics
+		__try {
+#endif
 		ge->RunFrame( sv.time );
+#if defined(EF_MODE) && defined(_WIN32)
+		} __except(EXCEPTION_EXECUTE_HANDLER) {
+			extern void EF_DumpCallRing( int count );
+			Com_Printf( S_COLOR_RED "*** CRASH in ge->RunFrame(sv.time=%d, settle frame %d) ***\n", sv.time, i );
+			EF_DumpCallRing( 30 );
+			Com_Error( ERR_DROP, "RunFrame crashed (exception 0x%08X)", GetExceptionCode() );
+		}
+#endif
+
 		sv.time += 100;
+		#ifndef EF_MODE
 		re.G2API_SetTime(sv.time,G2T_SV_TIME);
+#endif
 #ifdef EF_MODE
 		SV_EF_SyncAllEntities();
 		SV_EF_SyncPlayerState();
@@ -365,7 +387,9 @@ void SV_SpawnServer( const char *server, ForceReload_e eForceReload, qboolean bA
 	// run another frame to allow things to look at all connected clients
 	ge->RunFrame( sv.time );
 	sv.time += 100;
-	re.G2API_SetTime(sv.time,G2T_SV_TIME);
+	#ifndef EF_MODE
+		re.G2API_SetTime(sv.time,G2T_SV_TIME);
+#endif
 
 
 	// save systeminfo and serverinfo strings

@@ -25,6 +25,10 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #include "../server/exe_headers.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "../qcommon/cm_local.h"
 
 #include "server.h"
@@ -965,10 +969,29 @@ typedef struct {
 } ef_game_import_t;
 
 // Wrappers for EF's simpler function signatures
+extern void EF_LogCall( const char *func, int ent );
+extern void SV_EF_SyncAllEntities( void );
+
 static void SV_EF_Trace( ef_trace_t *results, const vec3_t start, const vec3_t mins,
 	const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask ) {
+	EF_LogCall( "trace", passEntityNum );
+	// Sync all entities before trace so engine sees current data from game DLL
+	SV_EF_SyncAllEntities();
 	trace_t engineTrace;
+#ifdef _WIN32
+	__try {
+#endif
 	SV_Trace( &engineTrace, start, mins, maxs, end, passEntityNum, contentmask, G2_NOCOLLIDE, 0 );
+#ifdef _WIN32
+	} __except(EXCEPTION_EXECUTE_HANDLER) {
+		// Trace crashed -- return no-hit result
+		Com_DPrintf(S_COLOR_YELLOW "SV_EF_Trace: SV_Trace crashed (passEnt=%d), returning no-hit\n", passEntityNum);
+		memset(&engineTrace, 0, sizeof(engineTrace));
+		engineTrace.fraction = 1.0f;
+		engineTrace.entityNum = ENTITYNUM_NONE;
+		VectorCopy(end, engineTrace.endpos);
+	}
+#endif
 	// Copy only the base fields that EF's trace_t expects
 	results->allsolid = engineTrace.allsolid;
 	results->startsolid = engineTrace.startsolid;

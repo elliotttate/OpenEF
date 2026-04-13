@@ -1,4 +1,7 @@
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "g_local.h"
 #include "g_functions.h"
 #include "Q3_Interface.h"
@@ -842,6 +845,10 @@ void G_RunFrame( int levelTime ) {
 		if ( !ent->inuse )
 			continue;
 
+#ifdef _WIN32
+		__try {
+#endif
+
 		// clear events that are too old
 		if ( level.time - ent->eventTime > EVENT_VALID_MSEC ) {
 			if ( ent->s.event ) {
@@ -925,6 +932,14 @@ void G_RunFrame( int levelTime ) {
 		G_RunThink( ent );	// be aware that ent may be free after returning from here, at least one func frees them
 		ClearNPCGlobals();			//	but these 2 funcs are ok
 		UpdateTeamCounters( ent );	//	   to call anyway on a freed ent.
+
+#ifdef _WIN32
+		} __except(EXCEPTION_EXECUTE_HANDLER) {
+			gi.Printf( "*** CRASH processing entity %d (%s) at time %d ***\n",
+				i, ent->classname ? ent->classname : "NULL", level.time );
+			ent->inuse = qfalse; // kill the crashing entity
+		}
+#endif
 	}
 
 	// perform final fixups on the player
