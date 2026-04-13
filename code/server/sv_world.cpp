@@ -63,6 +63,11 @@ be returned, otherwise a custom box tree will be constructed.
 clipHandle_t SV_ClipHandleForEntity( const gentity_t *ent ) {
 	if ( ent->bmodel ) {
 		// explicit hulls in the BSP model
+		if ( ent->s.modelindex < 0 || ent->s.modelindex >= CM_NumInlineModels() ) {
+			Com_DPrintf( S_COLOR_YELLOW "SV_ClipHandleForEntity: ent %d has bad modelindex %d (bmodel), using box\n",
+				ent->s.number, ent->s.modelindex );
+			return CM_TempBoxModel( ent->mins, ent->maxs );
+		}
 		return CM_InlineModel( ent->s.modelindex );
 	}
 
@@ -729,7 +734,6 @@ Ghoul2 Insert Start
 */
 
 		// decide if we should do the ghoul2 collision detection right here
-#ifndef EF_MODE
 		if ((trace.entityNum == touch->s.number) && (clip->eG2TraceType != G2_NOCOLLIDE))
 		{
 			// do we actually have a ghoul2 model here?
@@ -820,7 +824,6 @@ Ghoul2 Insert Start
 /*
 Ghoul2 Insert End
 */
-#endif // !EF_MODE
 
 	}
 }

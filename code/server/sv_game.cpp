@@ -67,7 +67,14 @@ gentity_t	*SV_GentityNum( int num ) {
 	gentity_t	*ent;
 
 	assert (num >=0);
+#ifdef EF_MODE
+	// Under EF_MODE, return from the shadow entity array instead of
+	// the game DLL's array (which has incompatible struct layout)
+	extern gentity_t sv_ef_entities[];
+	ent = &sv_ef_entities[num];
+#else
 	ent = (gentity_t *)((byte *)ge->gentities + ge->gentitySize*(num));
+#endif
 
 	return ent;
 }
@@ -886,6 +893,19 @@ static bool SV_WE_SetTempGlobalFogColor( vec3_t color )
 // including EF's g_public.h which would conflict with OpenJK's.
 // ============================================================================
 
+#include "../../codeEF/qcommon/sp_types.h"
+
+// Forward declarations for shadow entity wrappers (defined in sv_game_sp_ef.cpp)
+extern void SV_EF_InitShadowEntities( void );
+extern void SV_EF_SyncAllEntities( void );
+extern void SV_EF_SyncPlayerState( void );
+extern void SV_EF_LinkEntity( sp_gentity_t *ent );
+extern void SV_EF_UnlinkEntity( sp_gentity_t *ent );
+extern void SV_EF_SetBrushModel( sp_gentity_t *ent, const char *name );
+extern void SV_EF_AdjustAreaPortalState( sp_gentity_t *ent, qboolean open );
+extern qboolean SV_EF_EntityContact( const vec3_t mins, const vec3_t maxs, const sp_gentity_t *ent );
+extern int SV_EF_EntitiesInBox( const vec3_t mins, const vec3_t maxs, sp_gentity_t **list, int maxcount );
+
 // EF's trace_t is smaller than JKA's (no G2CollisionMap). Must use this for
 // the trace function pointer type to match EF's ABI.
 typedef struct {
@@ -928,17 +948,17 @@ typedef struct {
 	void	(*GetUserinfo)( int num, char *buffer, int bufferSize );
 	void	(*SetUserinfo)( int num, const char *buffer );
 	void	(*GetServerinfo)( char *buffer, int bufferSize );
-	void	(*SetBrushModel)( gentity_t *ent, const char *name );
+	void	(*SetBrushModel)( sp_gentity_t *ent, const char *name );
 	void	(*trace)( ef_trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask );
 	int		(*pointcontents)( const vec3_t point, int passEntityNum );
 	qboolean	(*inPVS)( const vec3_t p1, const vec3_t p2 );
 	qboolean	(*inPVSIgnorePortals)( const vec3_t p1, const vec3_t p2 );
-	void		(*AdjustAreaPortalState)( gentity_t *ent, qboolean open );
+	void		(*AdjustAreaPortalState)( sp_gentity_t *ent, qboolean open );
 	qboolean	(*AreasConnected)( int area1, int area2 );
-	void	(*linkentity)( gentity_t *ent );
-	void	(*unlinkentity)( gentity_t *ent );
-	int		(*EntitiesInBox)( const vec3_t mins, const vec3_t maxs, gentity_t **list, int maxcount );
-	qboolean	(*EntityContact)( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );
+	void	(*linkentity)( sp_gentity_t *ent );
+	void	(*unlinkentity)( sp_gentity_t *ent );
+	int		(*EntitiesInBox)( const vec3_t mins, const vec3_t maxs, sp_gentity_t **list, int maxcount );
+	qboolean	(*EntityContact)( const vec3_t mins, const vec3_t maxs, const sp_gentity_t *ent );
 	int		*S_Override;
 	void	*(*Malloc)( int bytes );
 	void	(*Free)( void *buf );
@@ -1025,10 +1045,17 @@ void SV_InitGameProgs (void) {
 	import.SendServerCommand = SV_GameSendServerCommand;
 
 
+#ifdef EF_MODE
+	import.linkentity = SV_EF_LinkEntity;
+	import.unlinkentity = SV_EF_UnlinkEntity;
+	import.EntitiesInBox = SV_EF_EntitiesInBox;
+	import.EntityContact = SV_EF_EntityContact;
+#else
 	import.linkentity = SV_LinkEntity;
 	import.unlinkentity = SV_UnlinkEntity;
 	import.EntitiesInBox = SV_AreaEntities;
 	import.EntityContact = SV_EntityContact;
+#endif
 #ifdef EF_MODE
 	import.trace = SV_EF_Trace;
 #else
@@ -1038,7 +1065,11 @@ void SV_InitGameProgs (void) {
 #ifndef EF_MODE
 	import.totalMapContents = CM_TotalMapContents;
 #endif
+#ifdef EF_MODE
+	import.SetBrushModel = SV_EF_SetBrushModel;
+#else
 	import.SetBrushModel = SV_SetBrushModel;
+#endif
 
 	import.inPVS = SV_inPVS;
 	import.inPVSIgnorePortals = SV_inPVSIgnorePortals;
@@ -1081,7 +1112,11 @@ void SV_InitGameProgs (void) {
 	import.saved_game = &ojk::SavedGame::get_instance();
 #endif
 
+#ifdef EF_MODE
+	import.AdjustAreaPortalState = SV_EF_AdjustAreaPortalState;
+#else
 	import.AdjustAreaPortalState = SV_AdjustAreaPortalState;
+#endif
 	import.AreasConnected = CM_AreasConnected;
 
 #ifdef EF_MODE
@@ -1234,6 +1269,12 @@ void SV_InitGameProgs (void) {
 	// use the current msec count for a random seed
 	Z_TagFree(TAG_G_ALLOC);
 	ge->Init( sv_mapname->string, sv_spawntarget->string, sv_mapChecksum->integer, CM_EntityString(), sv.time, com_frameTime, Com_Milliseconds(), eSavedGameJustLoaded, qbLoadTransition );
+
+#ifdef EF_MODE
+	// Initialize shadow entity system -- engine reads from shadow arrays,
+	// not directly from the game DLL's entity array
+	SV_EF_InitShadowEntities();
+#endif
 
 	// clear all gentity pointers that might still be set from
 	// a previous level

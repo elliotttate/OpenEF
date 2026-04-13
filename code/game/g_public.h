@@ -118,7 +118,6 @@ struct gentity_s {
 	gentity_t	*owner;				// objects never interact with their owners, to
 									// prevent player missiles from immediately
 									// colliding with their owner
-#ifndef EF_MODE
 /*
 Ghoul2 Insert Start
 */
@@ -129,7 +128,6 @@ Ghoul2 Insert Start
 /*
 Ghoul2 Insert End
 */
-#endif // !EF_MODE
 	// the game dll can add anything it wants after
 	// this point in the structure
 };

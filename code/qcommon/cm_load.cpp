@@ -971,9 +971,7 @@ cmodel_t	*CM_ClipHandleToModel( clipHandle_t handle, clipMap_t **clipMap )
 	if ( handle < 0 )
 	{
 #ifdef EF_MODE
-		// EF entities may have uninitialized brush model handles -- return box model as fallback
-		Com_Printf( S_COLOR_YELLOW "CM_ClipHandleToModel: bad handle %i, using box model\n", handle );
-		return &cmg.cmodels[BOX_MODEL_HANDLE];
+		return &box_model;
 #else
 		Com_Error( ERR_DROP, "CM_ClipHandleToModel: bad handle %i", handle );
 #endif
@@ -1010,8 +1008,6 @@ cmodel_t	*CM_ClipHandleToModel( clipHandle_t handle, clipMap_t **clipMap )
 	}
 
 #ifdef EF_MODE
-	// EF: entity may have garbage modelindex during init. Return box model as safe fallback.
-	Com_Printf( S_COLOR_YELLOW "CM_ClipHandleToModel: bad handle %i (numSubModels=%i), using box\n", handle, cmg.numSubModels );
 	return &box_model;
 #else
 	if ( handle < MAX_SUBMODELS )

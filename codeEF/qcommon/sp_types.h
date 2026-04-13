@@ -44,7 +44,12 @@ IMPORTANT MAINTENANCE NOTES
 #ifndef SP_TYPES_H
 #define SP_TYPES_H
 
+// When included from the engine (which already has its own q_shared.h),
+// skip the EF q_shared.h include. The types we need (vec3_t, trajectory_t,
+// qboolean, etc.) are already defined.
+#ifndef __Q_SHARED_H
 #include "q_shared.h"
+#endif
 
 // ============================================================================
 // SP entityState_t

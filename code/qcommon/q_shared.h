@@ -2448,9 +2448,6 @@ typedef struct entityState_s {// !!!!!!!!!!! LOADSAVE-affecting struct !!!!!!!!!
 
 	int		scale;			//Scale players
 
-#if defined(EF_MODE)
-	vec3_t	pushVec;		// EF-specific: knockback/push direction
-#else
 	//FIXME: why did IMMERSION dupe these 2 fields here?  There's no reason for this!!!
 	qboolean	saberInFlight;
 	qboolean	saberActive;
@@ -2458,7 +2455,6 @@ typedef struct entityState_s {// !!!!!!!!!!! LOADSAVE-affecting struct !!!!!!!!!
 #ifdef JK2_COMPAT_MODE
 	int		vehicleModel;	// For overriding your playermodel with a drivable vehicle
 #endif
-#endif // EF_MODE
 
 #ifndef JK2_COMPAT_MODE
 	//int		vehicleIndex;		// What kind of vehicle you're driving
@@ -2468,7 +2464,6 @@ typedef struct entityState_s {// !!!!!!!!!!! LOADSAVE-affecting struct !!!!!!!!!
 	int m_iVehicleNum;
 #endif // !JK2_COMPAT_MODE
 
-#ifndef EF_MODE
 /*
 Ghoul2 Insert Start
 */
@@ -2482,7 +2477,6 @@ Ghoul2 Insert End
 #ifndef JK2_COMPAT_MODE
 	qboolean	isPortalEnt;
 #endif // !JK2_COMPAT_MODE
-#endif // !EF_MODE
 
 
 	void sg_export(
@@ -2519,9 +2513,6 @@ Ghoul2 Insert End
 		saved_game.write<int32_t>(torsoAnim);
 		saved_game.write<int32_t>(torsoAnimTimer);
 		saved_game.write<int32_t>(scale);
-#if defined(EF_MODE)
-		saved_game.write<float>(pushVec);
-#else
 		saved_game.write<int32_t>(saberInFlight);
 		saved_game.write<int32_t>(saberActive);
 
@@ -2534,9 +2525,7 @@ Ghoul2 Insert End
 		saved_game.write<int32_t>(vehicleArmor);
 		saved_game.write<int32_t>(m_iVehicleNum);
 #endif // !JK2_COMPAT_MODE
-#endif // EF_MODE
 
-#ifndef EF_MODE
 		saved_game.write<float>(modelScale);
 		saved_game.write<int32_t>(radius);
 		saved_game.write<int32_t>(boltInfo);
@@ -2544,7 +2533,6 @@ Ghoul2 Insert End
 #ifndef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(isPortalEnt);
 #endif // !JK2_COMPAT_MODE
-#endif // !EF_MODE
 	}
 
 	void sg_import(
@@ -2581,9 +2569,6 @@ Ghoul2 Insert End
 		saved_game.read<int32_t>(torsoAnim);
 		saved_game.read<int32_t>(torsoAnimTimer);
 		saved_game.read<int32_t>(scale);
-#if defined(EF_MODE)
-		saved_game.read<float>(pushVec);
-#else
 		saved_game.read<int32_t>(saberInFlight);
 		saved_game.read<int32_t>(saberActive);
 
@@ -2596,9 +2581,7 @@ Ghoul2 Insert End
 		saved_game.read<int32_t>(vehicleArmor);
 		saved_game.read<int32_t>(m_iVehicleNum);
 #endif // !JK2_COMPAT_MODE
-#endif // EF_MODE
 
-#ifndef EF_MODE
 		saved_game.read<float>(modelScale);
 		saved_game.read<int32_t>(radius);
 		saved_game.read<int32_t>(boltInfo);
@@ -2606,7 +2589,6 @@ Ghoul2 Insert End
 #ifndef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(isPortalEnt);
 #endif // !JK2_COMPAT_MODE
-#endif // !EF_MODE
 	}
 } entityState_t;
 

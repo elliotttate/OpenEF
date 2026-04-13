@@ -310,17 +310,33 @@ void SV_SpawnServer( const char *server, ForceReload_e eForceReload, qboolean bA
 	// load and spawn all other entities
 	SV_InitGameProgs();
 
+#ifdef EF_MODE
+	extern void SV_EF_SyncAllEntities( void );
+	extern void SV_EF_SyncPlayerState( void );
+#endif
+	Com_Printf("SV: Starting settle frames\n");
 	// run a few frames to allow everything to settle
 	for ( i = 0 ;i < 4 ; i++ ) {
+		Com_Printf("SV: Settle frame %d\n", i);
+#ifdef EF_MODE
+		SV_EF_SyncAllEntities();
+#endif
 		ge->RunFrame( sv.time );
 		sv.time += 100;
 		re.G2API_SetTime(sv.time,G2T_SV_TIME);
+#ifdef EF_MODE
+		SV_EF_SyncAllEntities();
+		SV_EF_SyncPlayerState();
+#endif
 	}
 #ifndef JK2_COMPAT_MODE
 	ge->ConnectNavs(sv_mapname->string, sv_mapChecksum->integer);
 #endif
 
 	// create a baseline for more efficient communications
+#ifdef EF_MODE
+	SV_EF_SyncAllEntities();
+#endif
 	SV_CreateBaseline ();
 
 	for (i=0 ; i<1 ; i++) {

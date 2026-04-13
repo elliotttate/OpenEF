@@ -215,6 +215,7 @@ if(BuildSPEngine OR BuildJK2SPEngine OR BuildEFSPEngine)
 		"${SPDir}/server/sv_ccmds.cpp"
 		"${SPDir}/server/sv_client.cpp"
 		"${SPDir}/server/sv_game.cpp"
+		"${SPDir}/server/sv_game_sp_ef.cpp"
 		"${SPDir}/server/sv_init.cpp"
 		"${SPDir}/server/sv_main.cpp"
 		"${SPDir}/server/sv_savegame.cpp"
