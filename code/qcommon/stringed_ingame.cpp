@@ -997,7 +997,7 @@ const char *SE_GetString( const char *psPackageReference, const char *psStringRe
 
 const char *SE_GetString( const char *psPackageAndStringReference )
 {
-#ifdef JK2_MODE
+#if defined(JK2_MODE)
 	// Hacky but saves me from fixing 1000000 references --eez
 	extern const char *JK2SP_GetStringTextString(const char *Reference);
 	return JK2SP_GetStringTextString((const char *)psPackageAndStringReference);

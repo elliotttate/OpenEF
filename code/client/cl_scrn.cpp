@@ -584,7 +584,7 @@ void SCR_SetScreenshot(const byte *pbData, int w, int h)
 }
 
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 // This is just a client-side wrapper for the function RE_TempRawImage_ReadFromFile() in the renderer code...
 //
 

@@ -303,7 +303,7 @@ SV_AdjustAreaPortalState
 ========================
 */
 void SV_AdjustAreaPortalState( gentity_t *ent, qboolean open ) {
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	if ( !(ent->contents & CONTENTS_OPAQUE) ) {
 #ifndef FINAL_BUILD
 //		Com_Printf( "INFO: entity number %d not opaque: not affecting area portal!\n", ent->s.number );
@@ -878,6 +878,118 @@ static bool SV_WE_SetTempGlobalFogColor( vec3_t color )
 	return re.SetTempGlobalFogColor( color );
 }
 
+#ifdef EF_MODE
+// ============================================================================
+// EF-specific game import struct and bridge
+// EF's game_import_t is smaller than OpenJK's (no Ghoul2, no FlushCamFile,
+// different save system, simpler malloc). We define it here to avoid
+// including EF's g_public.h which would conflict with OpenJK's.
+// ============================================================================
+
+// EF's trace_t is smaller than JKA's (no G2CollisionMap). Must use this for
+// the trace function pointer type to match EF's ABI.
+typedef struct {
+	qboolean	allsolid;
+	qboolean	startsolid;
+	float		fraction;
+	vec3_t		endpos;
+	cplane_t	plane;
+	int			surfaceFlags;
+	int			contents;
+	int			entityNum;
+} ef_trace_t;
+
+typedef struct {
+	void	(*Printf)( const char *fmt, ... );
+	void	(*WriteCam)( const char *text );
+	void	(*Error)( int, const char *fmt, ... );
+	int		(*Milliseconds)( void );
+	cvar_t	*(*cvar)( const char *var_name, const char *value, int flags );
+	void	(*cvar_set)( const char *var_name, const char *value );
+	int		(*Cvar_VariableIntegerValue)( const char *var_name );
+	void	(*Cvar_VariableStringBuffer)( const char *var_name, char *buffer, int bufsize );
+	int		(*argc)( void );
+	char	*(*argv)( int n );
+	int		(*FS_FOpenFile)( const char *qpath, fileHandle_t *file, fsMode_t mode );
+	int		(*FS_Read)( void *buffer, int len, fileHandle_t f );
+	int		(*FS_Write)( const void *buffer, int len, fileHandle_t f );
+	void	(*FS_FCloseFile)( fileHandle_t f );
+	int		(*FS_ReadFile)( const char *name, void **buf );
+	void	(*FS_FreeFile)( void *buf );
+	int		(*FS_GetFileList)(  const char *path, const char *extension, char *listbuf, int bufsize );
+	qboolean	(*AppendToSaveGame)(unsigned long chid, void *data, int length);
+	int			(*ReadFromSaveGame)(unsigned long chid, void *pvAddress, int iLength, void **ppvAddressPtr);
+	int			(*ReadFromSaveGameOptional)(unsigned long chid, void *pvAddress, int iLength, void **ppvAddressPtr);
+	void	(*SendConsoleCommand)( const char *text );
+	void	(*DropClient)( int clientNum, const char *reason );
+	void	(*SendServerCommand)( int clientNum, const char *fmt, ... );
+	void	(*SetConfigstring)( int num, const char *string );
+	void	(*GetConfigstring)( int num, char *buffer, int bufferSize );
+	void	(*GetUserinfo)( int num, char *buffer, int bufferSize );
+	void	(*SetUserinfo)( int num, const char *buffer );
+	void	(*GetServerinfo)( char *buffer, int bufferSize );
+	void	(*SetBrushModel)( gentity_t *ent, const char *name );
+	void	(*trace)( ef_trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask );
+	int		(*pointcontents)( const vec3_t point, int passEntityNum );
+	qboolean	(*inPVS)( const vec3_t p1, const vec3_t p2 );
+	qboolean	(*inPVSIgnorePortals)( const vec3_t p1, const vec3_t p2 );
+	void		(*AdjustAreaPortalState)( gentity_t *ent, qboolean open );
+	qboolean	(*AreasConnected)( int area1, int area2 );
+	void	(*linkentity)( gentity_t *ent );
+	void	(*unlinkentity)( gentity_t *ent );
+	int		(*EntitiesInBox)( const vec3_t mins, const vec3_t maxs, gentity_t **list, int maxcount );
+	qboolean	(*EntityContact)( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );
+	int		*S_Override;
+	void	*(*Malloc)( int bytes );
+	void	(*Free)( void *buf );
+} ef_game_import_t;
+
+// Wrappers for EF's simpler function signatures
+static void SV_EF_Trace( ef_trace_t *results, const vec3_t start, const vec3_t mins,
+	const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask ) {
+	trace_t engineTrace;
+	SV_Trace( &engineTrace, start, mins, maxs, end, passEntityNum, contentmask, G2_NOCOLLIDE, 0 );
+	// Copy only the base fields that EF's trace_t expects
+	results->allsolid = engineTrace.allsolid;
+	results->startsolid = engineTrace.startsolid;
+	results->fraction = engineTrace.fraction;
+	VectorCopy( engineTrace.endpos, results->endpos );
+	results->plane = engineTrace.plane;
+	results->surfaceFlags = engineTrace.surfaceFlags;
+	results->contents = engineTrace.contents;
+	results->entityNum = engineTrace.entityNum;
+}
+
+static void *SV_EF_Malloc( int bytes ) {
+	return Z_Malloc( bytes, TAG_G_ALLOC, qtrue );
+}
+
+static int SV_EF_FS_ReadFile( const char *name, void **buf ) {
+	return (int)FS_ReadFile( name, buf );
+}
+
+static void SV_EF_FS_FreeFile( void *buf ) {
+	FS_FreeFile( buf );
+}
+
+static void SV_EF_Free( void *buf ) {
+	Z_Free( buf );
+}
+
+// Save game stubs (EF save system needs full implementation later)
+static qboolean SV_EF_AppendToSaveGame( unsigned long chid, void *data, int length ) {
+	// TODO: implement via ojk::SavedGame
+	return qtrue;
+}
+static int SV_EF_ReadFromSaveGame( unsigned long chid, void *pvAddress, int iLength, void **ppvAddressPtr ) {
+	// TODO: implement via ojk::SavedGame
+	return 0;
+}
+static int SV_EF_ReadFromSaveGameOptional( unsigned long chid, void *pvAddress, int iLength, void **ppvAddressPtr ) {
+	return 0;
+}
+#endif // EF_MODE
+
 /*
 ===============
 SV_InitGameProgs
@@ -886,7 +998,11 @@ Init the game subsystem for a new map
 ===============
 */
 void SV_InitGameProgs (void) {
+#ifdef EF_MODE
+	ef_game_import_t	import;
+#else
 	game_import_t	import;
+#endif
 	int				i;
 
 	// unload anything we have now
@@ -897,7 +1013,9 @@ void SV_InitGameProgs (void) {
 	// load a new game dll
 	import.Printf = Com_Printf;
 	import.WriteCam = Com_WriteCam;
+#ifndef EF_MODE
 	import.FlushCamFile = Com_FlushCamFile;
+#endif
 	import.Error = Com_Error;
 
 	import.Milliseconds = Sys_Milliseconds2;
@@ -911,9 +1029,15 @@ void SV_InitGameProgs (void) {
 	import.unlinkentity = SV_UnlinkEntity;
 	import.EntitiesInBox = SV_AreaEntities;
 	import.EntityContact = SV_EntityContact;
+#ifdef EF_MODE
+	import.trace = SV_EF_Trace;
+#else
 	import.trace = SV_Trace;
+#endif
 	import.pointcontents = SV_PointContents;
+#ifndef EF_MODE
 	import.totalMapContents = CM_TotalMapContents;
+#endif
 	import.SetBrushModel = SV_SetBrushModel;
 
 	import.inPVS = SV_inPVS;
@@ -940,21 +1064,39 @@ void SV_InitGameProgs (void) {
 	import.FS_Read = FS_Read;
 	import.FS_Write = FS_Write;
 	import.FS_FCloseFile = FS_FCloseFile;
+#ifdef EF_MODE
+	import.FS_ReadFile = SV_EF_FS_ReadFile;
+	import.FS_FreeFile = SV_EF_FS_FreeFile;
+#else
 	import.FS_ReadFile = FS_ReadFile;
 	import.FS_FreeFile = FS_FreeFile;
+#endif
 	import.FS_GetFileList = FS_GetFileList;
 
+#ifdef EF_MODE
+	import.AppendToSaveGame = SV_EF_AppendToSaveGame;
+	import.ReadFromSaveGame = SV_EF_ReadFromSaveGame;
+	import.ReadFromSaveGameOptional = SV_EF_ReadFromSaveGameOptional;
+#else
 	import.saved_game = &ojk::SavedGame::get_instance();
+#endif
 
 	import.AdjustAreaPortalState = SV_AdjustAreaPortalState;
 	import.AreasConnected = CM_AreasConnected;
 
+#ifdef EF_MODE
+	import.S_Override = s_entityWavVol;
+	import.Malloc = SV_EF_Malloc;
+	import.Free = SV_EF_Free;
+#else
 	import.VoiceVolume = s_entityWavVol;
 
 	import.Malloc = G_ZMalloc_Helper;
 	import.Free = Z_Free;
 	import.bIsFromZone = Z_IsFromZone;
+#endif
 
+#ifndef EF_MODE
 	import.G2API_AddBolt = SV_G2API_AddBolt;
 	import.G2API_AttachEnt = SV_G2API_AttachEnt;
 	import.G2API_AttachG2Model = SV_G2API_AttachG2Model;
@@ -1047,8 +1189,11 @@ void SV_InitGameProgs (void) {
 	import.WE_IsShaking = SV_WE_IsShaking;
 	import.WE_AddWeatherZone = SV_WE_AddWeatherZone;
 	import.WE_SetTempGlobalFogColor = SV_WE_SetTempGlobalFogColor;
+#endif // !EF_MODE (closes the Ghoul2/weather block)
 
-#ifdef JK2_MODE
+#if defined(EF_MODE)
+	const char *gamename = "efgame";
+#elif defined(JK2_COMPAT_MODE)
 	const char *gamename = "jospgame";
 #else
 	const char *gamename = "jagame";
@@ -1066,7 +1211,11 @@ void SV_InitGameProgs (void) {
 		Com_Error( ERR_DROP, "Failed to load %s library", gamename );
 	}
 
-	if (ge->apiversion != GAME_API_VERSION)
+	if (ge->apiversion != GAME_API_VERSION
+#ifdef EF_MODE
+		&& ge->apiversion != 6 // EF game API version
+#endif
+	)
 	{
 		int apiVersion = ge->apiversion;
 		Sys_UnloadDll( gameLibrary );

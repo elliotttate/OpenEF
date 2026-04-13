@@ -316,7 +316,7 @@ void SV_SpawnServer( const char *server, ForceReload_e eForceReload, qboolean bA
 		sv.time += 100;
 		re.G2API_SetTime(sv.time,G2T_SV_TIME);
 	}
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	ge->ConnectNavs(sv_mapname->string, sv_mapChecksum->integer);
 #endif
 

@@ -1882,7 +1882,7 @@ static void PlayCinematic(const char *arg, const char *s, qboolean qbInGame)
 		if (!Q_stricmp(arg,"video/jk0101_sw.roq"))
 		{
 			psAudioFile = "music/cinematic_1";
-#ifdef JK2_MODE
+#if defined(JK2_MODE)
 			hCrawl = re.RegisterShaderNoMip( va("menu/video/tc_%d", sp_language->integer) );
 			if(!hCrawl)
 			{

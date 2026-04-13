@@ -3767,7 +3767,14 @@ static void ScanAndLoadShaderFiles( void )
 	long sum = 0, summand;
 
 	// scan for shader files
-	shaderFiles = ri.FS_ListFiles( "shaders", ".shader", &numShaderFiles );
+	const char *shaderDir = "shaders";
+	shaderFiles = ri.FS_ListFiles( shaderDir, ".shader", &numShaderFiles );
+
+	// Fallback: EF and Q3 use "scripts/" instead of "shaders/" for shader files
+	if ( !shaderFiles || !numShaderFiles ) {
+		shaderDir = "scripts";
+		shaderFiles = ri.FS_ListFiles( shaderDir, ".shader", &numShaderFiles );
+	}
 
 	if ( !shaderFiles || !numShaderFiles )
 	{
@@ -3784,7 +3791,7 @@ static void ScanAndLoadShaderFiles( void )
 	{
 		char filename[MAX_QPATH];
 
-		Com_sprintf( filename, sizeof( filename ), "shaders/%s", shaderFiles[i] );
+		Com_sprintf( filename, sizeof( filename ), "%s/%s", shaderDir, shaderFiles[i] );
 		//ri.Printf( PRINT_DEVELOPER, "...loading '%s'\n", filename );
 		// Looks like stripping out crap in the shaders will save about 200k
 		summand = ri.FS_ReadFile( filename, (void **)&buffers[i] );

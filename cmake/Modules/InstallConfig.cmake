@@ -26,6 +26,8 @@ set(JKAMPServerComponent "JKAMPServer")
 set(JKAMPClientComponent "JKAMPClient")
 set(JKASPClientComponent "JKASPClient")
 set(JK2SPClientComponent "JK2SPClient")
+set(EFInstallDir "EliteForce")
+set(EFSPClientComponent "EFSPClient")
 
 # Component display names
 include(CPackComponent)

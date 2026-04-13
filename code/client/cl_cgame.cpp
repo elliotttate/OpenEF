@@ -71,7 +71,9 @@ qboolean CL_InitCGameVM( void *gameLibrary )
 	cgvm.entryPoint = (intptr_t (*)(int,intptr_t,intptr_t,intptr_t,intptr_t,intptr_t,intptr_t,intptr_t,intptr_t))Sys_LoadFunction( gameLibrary, "vmMain" );
 
 	if ( !cgvm.entryPoint || !dllEntry ) {
-#ifdef JK2_MODE
+#if defined(EF_MODE)
+		const char *gamename = "efgame";
+#elif defined(JK2_COMPAT_MODE)
 		const char *gamename = "jospgame";
 #else
 		const char *gamename = "jagame";
@@ -434,7 +436,7 @@ void CL_ShutdownCGame( void ) {
 //	cgvm = NULL;
 }
 
-#ifdef JK2_MODE
+#if defined(JK2_MODE)
 /*
 ====================
 CL_ConvertJK2SysCall
@@ -809,9 +811,11 @@ void CM_SnapPVS(vec3_t origin,byte *buffer);
 extern void		Menu_Paint(menuDef_t *menu, qboolean forcePaint);
 extern menuDef_t *Menus_FindByName(const char *p);
 intptr_t CL_CgameSystemCalls( intptr_t *args ) {
-#ifdef JK2_MODE
+#if defined(JK2_MODE)
 	args[0] = (intptr_t)CL_ConvertJK2SysCall((cgameJK2Import_t)args[0]);
 #endif
+	// EF_MODE: EF uses the same syscall enum layout as JKA for basic calls,
+	// no conversion needed (EF-specific syscalls will be handled individually)
 	switch( args[0] ) {
 	case CG_PRINT:
 		Com_Printf( "%s", VMA(1) );
@@ -1207,7 +1211,7 @@ Ghoul2 Insert End
 	case CG_UI_GETMENUINFO:
 		menuDef_t *menu;
 		int		*xPos,*yPos,*w,*h,result;
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		menu = Menus_FindByName((char *) VMA(1));	// Get menu
 		if (menu)
 		{
@@ -1322,7 +1326,7 @@ Ghoul2 Insert End
 
 		return result;
 
-#ifdef JK2_MODE
+#if defined(JK2_MODE)
 	case CG_SP_GETSTRINGTEXTSTRING:
 	case CG_SP_GETSTRINGTEXT:
 		const char* text;

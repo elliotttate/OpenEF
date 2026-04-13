@@ -729,6 +729,7 @@ Ghoul2 Insert Start
 */
 
 		// decide if we should do the ghoul2 collision detection right here
+#ifndef EF_MODE
 		if ((trace.entityNum == touch->s.number) && (clip->eG2TraceType != G2_NOCOLLIDE))
 		{
 			// do we actually have a ghoul2 model here?
@@ -819,6 +820,7 @@ Ghoul2 Insert Start
 /*
 Ghoul2 Insert End
 */
+#endif // !EF_MODE
 
 	}
 }

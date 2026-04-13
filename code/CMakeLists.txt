@@ -30,7 +30,7 @@ endif(BuildSPGame)
 add_subdirectory("${SPDir}/rd-vanilla")
 
 #    Add Engine Project
-if(BuildSPEngine OR BuildJK2SPEngine)
+if(BuildSPEngine OR BuildJK2SPEngine OR BuildEFSPEngine)
 	# Libraries
 	if(WIN32)
 		set(SPEngineLibraries "winmm")
@@ -455,5 +455,9 @@ if(BuildSPEngine OR BuildJK2SPEngine)
 		set(SPEngineDefines ${SPEngineDefines} "JK2_MODE")
 		add_sp_project(${JK2SPEngine} "JK2 SP Client" ${JK2SPDir} ${JK2InstallDir} ${JK2SPClientComponent})
 	endif(BuildJK2SPEngine)
+	if(BuildEFSPEngine)
+		set(SPEngineDefines ${SPEngineDefines} "EF_MODE")
+		add_sp_project(${EFSPEngine} "EF SP Client" ${EFSPDir} ${EFInstallDir} ${EFSPClientComponent})
+	endif(BuildEFSPEngine)
 
-endif(BuildSPEngine OR BuildJK2SPEngine)
+endif(BuildSPEngine OR BuildJK2SPEngine OR BuildEFSPEngine)

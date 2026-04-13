@@ -277,7 +277,7 @@ do the apropriate things.
 =============
 */
 void SG_Shutdown();
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 extern void SCR_UnprecacheScreenshot();
 #endif
 void NORETURN QDECL Com_Error( int code, const char *fmt, ... ) {
@@ -308,7 +308,7 @@ void NORETURN QDECL Com_Error( int code, const char *fmt, ... ) {
 	}
 	lastErrorTime = currentTime;
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	SCR_UnprecacheScreenshot();
 #endif
 
@@ -1163,7 +1163,10 @@ void Com_Init( char *commandLine ) {
 
 		com_version = Cvar_Get ("version", JK_VERSION " " PLATFORM_STRING " " SOURCE_DATE, CVAR_ROM | CVAR_SERVERINFO );
 
-#ifdef JK2_MODE
+#if defined(EF_MODE)
+		SE_Init();	// EF uses JKA string system as fallback
+		Com_Printf("Running Elite Force Mode\n");
+#elif defined(JK2_COMPAT_MODE)
 		JK2SP_Init();
 		Com_Printf("Running Jedi Outcast Mode\n");
 #else
@@ -1615,7 +1618,7 @@ void Com_Shutdown (void) {
 		com_journalFile = 0;
 	}
 
-#ifdef JK2_MODE
+#if defined(JK2_MODE)
 	JK2SP_Shutdown();
 #else
 	SE_ShutDown();//close the string packages

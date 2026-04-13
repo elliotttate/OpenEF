@@ -194,3 +194,12 @@ compile_commands.json
 #############
 [Bb]uild*/
 cmake-build-*
+
+# OpenEF runtime files
+BaseEF/
+OpenJK/
+*.exe
+*.dll
+build/
+build_*/
+.claude/

@@ -61,11 +61,25 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #endif
 
 //rww - conveniently toggle "gore" code, for model decals and stuff.
-#ifndef JK2_MODE
+#if !defined(JK2_COMPAT_MODE) && !defined(EF_MODE)
 #define _G2_GORE
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE && !EF_MODE
 
-#if JK2_MODE
+// EF_MODE follows the JK2_COMPAT_MODE code path for most engine features
+// (no Ghoul2 extensions, no advanced Force powers, simpler configstrings)
+#if defined(JK2_COMPAT_MODE) || defined(EF_MODE)
+#define JK2_COMPAT_MODE
+#endif
+
+#if defined(EF_MODE)
+#define PRODUCT_NAME			"openef_sp"
+
+#define CLIENT_WINDOW_TITLE "OpenEF (SP)"
+#define CLIENT_CONSOLE_TITLE "OpenEF Console (SP)"
+#define HOMEPATH_NAME_UNIX "openef"
+#define HOMEPATH_NAME_WIN "OpenEF"
+#define HOMEPATH_NAME_MACOSX HOMEPATH_NAME_WIN
+#elif JK2_MODE
 #define PRODUCT_NAME			"openjo_sp"
 
 #define CLIENT_WINDOW_TITLE "OpenJO (SP)"
@@ -83,7 +97,11 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #define HOMEPATH_NAME_MACOSX HOMEPATH_NAME_WIN
 #endif
 
+#if defined(EF_MODE)
+#define	BASEGAME "BaseEF"
+#else
 #define	BASEGAME "base"
+#endif
 #define OPENJKGAME "OpenJK"
 
 #define Q3CONFIG_NAME PRODUCT_NAME ".cfg"
@@ -631,11 +649,11 @@ typedef struct {
 
 #define	MAX_MODELS			256
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 #define MAX_SOUNDS (256)
 #else
 #define	MAX_SOUNDS			380
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 #define MAX_SUB_BSP			32
 
@@ -643,11 +661,11 @@ typedef struct {
 
 #define MAX_FX				128
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 #define MAX_WORLD_FX (4)
 #else
 #define MAX_WORLD_FX		66		// was 16 // was 4
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 /*
 Ghoul2 Insert Start
@@ -657,11 +675,11 @@ Ghoul2 Insert Start
 Ghoul2 Insert End
 */
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 #define MAX_CONFIGSTRINGS (1024)
 #else
 #define	MAX_CONFIGSTRINGS	1300//1024 //rww - I had to up this for terrains
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 // these are the only configstrings that the system reserves, all the
 // other ones are strictly for servergame to clientgame communication
@@ -682,15 +700,15 @@ Ghoul2 Insert End
 
 #define	CS_MODELS			10
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 #define	CS_SKYBOXORG		(CS_MODELS+MAX_MODELS)		//rww - skybox info
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 #define CS_SOUNDS (CS_MODELS + MAX_MODELS)
 #else
 #define	CS_SOUNDS			(CS_SKYBOXORG+1)
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 #ifdef BASE_SAVE_COMPAT
 #define CS_RESERVED1		(CS_SOUNDS+MAX_SOUNDS) // reserved field for base compat from immersion removal
@@ -701,16 +719,16 @@ Ghoul2 Insert End
 
 #define	CS_LIGHT_STYLES		(CS_PLAYERS+MAX_CLIENTS)
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 #define CS_TERRAINS			(CS_LIGHT_STYLES + (MAX_LIGHT_STYLES*3))
 #define CS_BSP_MODELS		(CS_TERRAINS + MAX_TERRAINS)
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 #define CS_EFFECTS (CS_LIGHT_STYLES + (MAX_LIGHT_STYLES * 3))
 #else
 #define CS_EFFECTS			(CS_BSP_MODELS + MAX_SUB_BSP)//(CS_LIGHT_STYLES + (MAX_LIGHT_STYLES*3))
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 /*
 Ghoul2 Insert Start
@@ -749,17 +767,26 @@ typedef enum
 	FP_SABER_DEFENSE,
 	FP_SABER_OFFENSE,
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	//new Jedi Academy powers
 	FP_RAGE,//duration - speed, invincibility and extra damage for short period, drains your health and leaves you weak and slow afterwards.
 	FP_PROTECT,//duration - protect against physical/energy (level 1 stops blaster/energy bolts, level 2 stops projectiles, level 3 protects against explosions)
 	FP_ABSORB,//duration - protect against dark force powers (grip, lightning, drain - maybe push/pull, too?)
 	FP_DRAIN,//hold/duration - drain force power for health
 	FP_SEE,//duration - detect/see hidden enemies
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 	NUM_FORCE_POWERS
 } forcePowers_t;
+
+#ifdef JK2_COMPAT_MODE
+// Stub defines so JKA engine UI code compiles in JK2/EF mode (these powers don't exist)
+#define FP_RAGE			(NUM_FORCE_POWERS)
+#define FP_PROTECT		(NUM_FORCE_POWERS)
+#define FP_ABSORB		(NUM_FORCE_POWERS)
+#define FP_DRAIN		(NUM_FORCE_POWERS)
+#define FP_SEE			(NUM_FORCE_POWERS)
+#endif // JK2_COMPAT_MODE
 
 typedef enum
 {
@@ -1639,7 +1666,7 @@ public:
 	vec3_t		serverViewOrg;
 
 	qboolean	saberInFlight;
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	qboolean	saberActive;	// -- JK2 --
 
 	int			vehicleModel;	// -- JK2 --
@@ -1674,7 +1701,7 @@ public:
 	int			lastStationary;	//last time you were on the ground
 	int			weaponShotCount;
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	//FIXME: maybe allocate all these structures (saber, force powers, vehicles)
 	//			or descend them as classes - so not every client has all this info
 	TSaberInfo	saber[MAX_SABERS];
@@ -1798,20 +1825,20 @@ public:
 					}
 					return parryBonus;
 				};
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 	short		saberMove;
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	short		saberMoveNext;
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 	short		saberBounceMove;
 	short		saberBlocking;
 	short		saberBlocked;
 	short		leanStopDebounceTime;
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	float		saberLengthOld;
 #endif
 	int			saberEntityNum;
@@ -1827,11 +1854,11 @@ public:
 	int			saberLockTime;
 	int			saberLockEnemy;
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	int			saberStylesKnown;
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	char		*saberModel;
 #endif
 
@@ -1842,10 +1869,10 @@ public:
 	int			forcePowerMax;
 	int			forcePowerRegenDebounceTime;
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	int			forcePowerRegenRate;				//default is 100ms
 	int			forcePowerRegenAmount;				//default is 1
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 	int			forcePowerLevel[NUM_FORCE_POWERS];		//so we know the max forceJump power you have
 	float		forceJumpZStart;					//So when you land, you don't get hurt as much
@@ -1853,14 +1880,14 @@ public:
 	int			forceGripEntityNum;					//what entity I'm gripping
 	vec3_t		forceGripOrg;						//where the gripped ent should be lifted to
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	int			forceDrainEntityNum;				//what entity I'm draining
 	vec3_t		forceDrainOrg;						//where the drained ent should be lifted to
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 	int			forceHealCount;						//how many points of force heal have been applied so far
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	//new Jedi Academy force powers
 	int			forceAllowDeactivateTime;
 	int			forceRageDrainTime;
@@ -1871,7 +1898,7 @@ public:
 	int			pullAttackEntNum;
 	int			pullAttackTime;
 	int			lastKickedEntNum;
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 	int			taunting;							//replaced BUTTON_GESTURE
 
@@ -1881,7 +1908,7 @@ public:
 	float		waterheight;						//exactly what the z org of the water is (will be +4 above if under water, -4 below if not in water)
 	waterHeightLevel_t	waterHeightLevel;					//how high it really is
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	//testing IK grabbing
 	qboolean	ikStatus;		//for IK
 	int			heldClient;		//for IK, who I'm grabbing, if anyone
@@ -1896,7 +1923,7 @@ public:
 	//NOTE: not really used in SP, just for Fighter Vehicle damage stuff
 	int			brokenLimbs;
 	int			electrifyTime;
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 
 	void sg_export(
@@ -1950,7 +1977,7 @@ public:
 		saved_game.write<float>(serverViewOrg);
 		saved_game.write<int32_t>(saberInFlight);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(saberActive);
 		saved_game.write<int32_t>(vehicleModel);
 		saved_game.write<int32_t>(viewEntity);
@@ -1961,7 +1988,7 @@ public:
 #else
 		saved_game.write<int32_t>(viewEntity);
 		saved_game.write<int32_t>(forcePowersActive);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		saved_game.write<int32_t>(useTime);
 		saved_game.write<int32_t>(lastShotTime);
@@ -1970,26 +1997,26 @@ public:
 		saved_game.write<int32_t>(lastStationary);
 		saved_game.write<int32_t>(weaponShotCount);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.write<>(saber);
 		saved_game.write<int32_t>(dualSabers);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.write<int16_t>(saberMove);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.write<int16_t>(saberMoveNext);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.write<int16_t>(saberBounceMove);
 		saved_game.write<int16_t>(saberBlocking);
 		saved_game.write<int16_t>(saberBlocked);
 		saved_game.write<int16_t>(leanStopDebounceTime);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_game.skip(2);
 		saved_game.write<float>(saberLengthOld);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		saved_game.write<int32_t>(saberEntityNum);
 		saved_game.write<float>(saberEntityDist);
@@ -2004,13 +2031,13 @@ public:
 		saved_game.write<int32_t>(saberLockTime);
 		saved_game.write<int32_t>(saberLockEnemy);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(saberStylesKnown);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(saberModel);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		saved_game.write<int32_t>(forcePowersKnown);
 		saved_game.write<int32_t>(forcePowerDuration);
@@ -2019,10 +2046,10 @@ public:
 		saved_game.write<int32_t>(forcePowerMax);
 		saved_game.write<int32_t>(forcePowerRegenDebounceTime);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(forcePowerRegenRate);
 		saved_game.write<int32_t>(forcePowerRegenAmount);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.write<int32_t>(forcePowerLevel);
 		saved_game.write<float>(forceJumpZStart);
@@ -2030,14 +2057,14 @@ public:
 		saved_game.write<int32_t>(forceGripEntityNum);
 		saved_game.write<float>(forceGripOrg);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(forceDrainEntityNum);
 		saved_game.write<float>(forceDrainOrg);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.write<int32_t>(forceHealCount);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(forceAllowDeactivateTime);
 		saved_game.write<int32_t>(forceRageDrainTime);
 		saved_game.write<int32_t>(forceRageRecoveryTime);
@@ -2047,7 +2074,7 @@ public:
 		saved_game.write<int32_t>(pullAttackEntNum);
 		saved_game.write<int32_t>(pullAttackTime);
 		saved_game.write<int32_t>(lastKickedEntNum);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.write<int32_t>(taunting);
 		saved_game.write<float>(jumpZStart);
@@ -2055,7 +2082,7 @@ public:
 		saved_game.write<float>(waterheight);
 		saved_game.write<int32_t>(waterHeightLevel);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(ikStatus);
 		saved_game.write<int32_t>(heldClient);
 		saved_game.write<int32_t>(heldByClient);
@@ -2065,7 +2092,7 @@ public:
 		saved_game.write<int32_t>(vehTurnaroundTime);
 		saved_game.write<int32_t>(brokenLimbs);
 		saved_game.write<int32_t>(electrifyTime);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 	}
 
 	void sg_import(
@@ -2119,7 +2146,7 @@ public:
 		saved_game.read<float>(serverViewOrg);
 		saved_game.read<int32_t>(saberInFlight);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(saberActive);
 		saved_game.read<int32_t>(vehicleModel);
 		saved_game.read<int32_t>(viewEntity);
@@ -2130,7 +2157,7 @@ public:
 #else
 		saved_game.read<int32_t>(viewEntity);
 		saved_game.read<int32_t>(forcePowersActive);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		saved_game.read<int32_t>(useTime);
 		saved_game.read<int32_t>(lastShotTime);
@@ -2139,26 +2166,26 @@ public:
 		saved_game.read<int32_t>(lastStationary);
 		saved_game.read<int32_t>(weaponShotCount);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.read<>(saber);
 		saved_game.read<int32_t>(dualSabers);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.read<int16_t>(saberMove);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.read<int16_t>(saberMoveNext);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.read<int16_t>(saberBounceMove);
 		saved_game.read<int16_t>(saberBlocking);
 		saved_game.read<int16_t>(saberBlocked);
 		saved_game.read<int16_t>(leanStopDebounceTime);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_game.skip(2);
 		saved_game.read<float>(saberLengthOld);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		saved_game.read<int32_t>(saberEntityNum);
 		saved_game.read<float>(saberEntityDist);
@@ -2173,13 +2200,13 @@ public:
 		saved_game.read<int32_t>(saberLockTime);
 		saved_game.read<int32_t>(saberLockEnemy);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(saberStylesKnown);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(saberModel);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		saved_game.read<int32_t>(forcePowersKnown);
 		saved_game.read<int32_t>(forcePowerDuration);
@@ -2188,10 +2215,10 @@ public:
 		saved_game.read<int32_t>(forcePowerMax);
 		saved_game.read<int32_t>(forcePowerRegenDebounceTime);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(forcePowerRegenRate);
 		saved_game.read<int32_t>(forcePowerRegenAmount);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.read<int32_t>(forcePowerLevel);
 		saved_game.read<float>(forceJumpZStart);
@@ -2199,14 +2226,14 @@ public:
 		saved_game.read<int32_t>(forceGripEntityNum);
 		saved_game.read<float>(forceGripOrg);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(forceDrainEntityNum);
 		saved_game.read<float>(forceDrainOrg);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.read<int32_t>(forceHealCount);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(forceAllowDeactivateTime);
 		saved_game.read<int32_t>(forceRageDrainTime);
 		saved_game.read<int32_t>(forceRageRecoveryTime);
@@ -2216,7 +2243,7 @@ public:
 		saved_game.read<int32_t>(pullAttackEntNum);
 		saved_game.read<int32_t>(pullAttackTime);
 		saved_game.read<int32_t>(lastKickedEntNum);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 		saved_game.read<int32_t>(taunting);
 		saved_game.read<float>(jumpZStart);
@@ -2224,7 +2251,7 @@ public:
 		saved_game.read<float>(waterheight);
 		saved_game.read<int32_t>(waterHeightLevel);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(ikStatus);
 		saved_game.read<int32_t>(heldClient);
 		saved_game.read<int32_t>(heldByClient);
@@ -2234,7 +2261,7 @@ public:
 		saved_game.read<int32_t>(vehTurnaroundTime);
 		saved_game.read<int32_t>(brokenLimbs);
 		saved_game.read<int32_t>(electrifyTime);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 	}
 }; // PlayerStateBase
 
@@ -2421,22 +2448,27 @@ typedef struct entityState_s {// !!!!!!!!!!! LOADSAVE-affecting struct !!!!!!!!!
 
 	int		scale;			//Scale players
 
+#if defined(EF_MODE)
+	vec3_t	pushVec;		// EF-specific: knockback/push direction
+#else
 	//FIXME: why did IMMERSION dupe these 2 fields here?  There's no reason for this!!!
 	qboolean	saberInFlight;
 	qboolean	saberActive;
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	int		vehicleModel;	// For overriding your playermodel with a drivable vehicle
 #endif
+#endif // EF_MODE
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	//int		vehicleIndex;		// What kind of vehicle you're driving
 	vec3_t	vehicleAngles;		//
 	int		vehicleArmor;		// current armor of your vehicle (explodes if drops to 0)
 	// 0 if not in a vehicle, otherwise the client number.
 	int m_iVehicleNum;
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
+#ifndef EF_MODE
 /*
 Ghoul2 Insert Start
 */
@@ -2447,9 +2479,10 @@ Ghoul2 Insert Start
 Ghoul2 Insert End
 */
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	qboolean	isPortalEnt;
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
+#endif // !EF_MODE
 
 
 	void sg_export(
@@ -2486,26 +2519,32 @@ Ghoul2 Insert End
 		saved_game.write<int32_t>(torsoAnim);
 		saved_game.write<int32_t>(torsoAnimTimer);
 		saved_game.write<int32_t>(scale);
+#if defined(EF_MODE)
+		saved_game.write<float>(pushVec);
+#else
 		saved_game.write<int32_t>(saberInFlight);
 		saved_game.write<int32_t>(saberActive);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(vehicleModel);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.write<float>(vehicleAngles);
 		saved_game.write<int32_t>(vehicleArmor);
 		saved_game.write<int32_t>(m_iVehicleNum);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
+#endif // EF_MODE
 
+#ifndef EF_MODE
 		saved_game.write<float>(modelScale);
 		saved_game.write<int32_t>(radius);
 		saved_game.write<int32_t>(boltInfo);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.write<int32_t>(isPortalEnt);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
+#endif // !EF_MODE
 	}
 
 	void sg_import(
@@ -2542,26 +2581,32 @@ Ghoul2 Insert End
 		saved_game.read<int32_t>(torsoAnim);
 		saved_game.read<int32_t>(torsoAnimTimer);
 		saved_game.read<int32_t>(scale);
+#if defined(EF_MODE)
+		saved_game.read<float>(pushVec);
+#else
 		saved_game.read<int32_t>(saberInFlight);
 		saved_game.read<int32_t>(saberActive);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(vehicleModel);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.read<float>(vehicleAngles);
 		saved_game.read<int32_t>(vehicleArmor);
 		saved_game.read<int32_t>(m_iVehicleNum);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
+#endif // EF_MODE
 
+#ifndef EF_MODE
 		saved_game.read<float>(modelScale);
 		saved_game.read<int32_t>(radius);
 		saved_game.read<int32_t>(boltInfo);
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 		saved_game.read<int32_t>(isPortalEnt);
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
+#endif // !EF_MODE
 	}
 } entityState_t;
 

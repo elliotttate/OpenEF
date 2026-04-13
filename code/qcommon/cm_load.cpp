@@ -26,6 +26,10 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #include "cm_local.h"
 #include "qcommon/ojk_saved_game.h"
 #include "qcommon/ojk_saved_game_helper.h"
+#include "qcommon/qfiles_q3bsp.h"
+
+// Set to true when loading a Q3/EF BSP (version 46) vs JKA BSP (version 1)
+static qboolean cm_isQ3Bsp = qfalse;
 
 #ifdef BSPC
 void SetPlaneSignbits (cplane_t *out) {
@@ -269,7 +273,7 @@ void CMod_LoadBrushes( lump_t *l, clipMap_t &cm ) {
 			Com_Error( ERR_DROP, "CMod_LoadBrushes: bad shaderNum: %i", out->shaderNum );
 		}
 		out->contents = cm.shaders[out->shaderNum].contentFlags;
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		//JK2 HACK: for water that cuts vis but is not solid!!! (used on yavin swamp)
 		if ( cm.shaders[out->shaderNum].surfaceFlags & SURF_SLICK )
 		{
@@ -431,29 +435,43 @@ void CMod_LoadBrushSides (lump_t *l, clipMap_t &cm)
 {
 	int				i;
 	cbrushside_t	*out;
-	dbrushside_t 	*in;
 	int				count;
 	int				num;
+	int				sideSize;
 
-	in = (dbrushside_t *)(cmod_base + l->fileofs);
-	if ( l->filelen % sizeof(*in) ) {
+	// Q3/EF BSP uses smaller dbrushside_t (no drawSurfNum field)
+	if ( cm_isQ3Bsp ) {
+		sideSize = sizeof( q3dbrushside_t );
+	} else {
+		sideSize = sizeof( dbrushside_t );
+	}
+
+	if ( l->filelen % sideSize ) {
 		Com_Error (ERR_DROP, "MOD_LoadBmodel: funny lump size");
 	}
-	count = l->filelen / sizeof(*in);
+	count = l->filelen / sideSize;
 
 	cm.brushsides = (cbrushside_t *) Z_Malloc( ( BOX_SIDES + count ) * sizeof( *cm.brushsides ), TAG_BSP, qfalse);
 	cm.numBrushSides = count;
 
 	out = cm.brushsides;
 
-	for ( i=0 ; i<count ; i++, in++, out++) {
-		num = LittleLong( in->planeNum );
+	byte *inData = (byte *)(cmod_base + l->fileofs);
+	for ( i=0 ; i<count ; i++, out++) {
+		if ( cm_isQ3Bsp ) {
+			q3dbrushside_t *q3in = (q3dbrushside_t *)inData;
+			num = LittleLong( q3in->planeNum );
+			out->shaderNum = LittleLong( q3in->shaderNum );
+		} else {
+			dbrushside_t *in = (dbrushside_t *)inData;
+			num = LittleLong( in->planeNum );
+			out->shaderNum = LittleLong( in->shaderNum );
+		}
 		out->plane = &cm.planes[num];
-		out->shaderNum = LittleLong( in->shaderNum );
 		if ( out->shaderNum < 0 || out->shaderNum >= cm.numShaders ) {
 			Com_Error( ERR_DROP, "CMod_LoadBrushSides: bad shaderNum: %i", out->shaderNum );
 		}
-//		out->surfaceFlags = cm.shaders[out->shaderNum].surfaceFlags;
+		inData += sideSize;
 	}
 }
 
@@ -526,8 +544,6 @@ CMod_LoadPatches
 */
 #define	MAX_PATCH_VERTS		1024
 void CMod_LoadPatches( lump_t *surfs, lump_t *verts, clipMap_t &cm ) {
-	mapVert_t	*dv, *dv_p;
-	dsurface_t	*in;
 	int			count;
 	int			i, j;
 	int			c;
@@ -535,43 +551,75 @@ void CMod_LoadPatches( lump_t *surfs, lump_t *verts, clipMap_t &cm ) {
 	vec3_t		points[MAX_PATCH_VERTS];
 	int			width, height;
 	int			shaderNum;
+	int			surfSize, vertSize;
 
-	in = (dsurface_t *)(cmod_base + surfs->fileofs);
-	if (surfs->filelen % sizeof(*in))
+	// Q3/EF BSP uses different struct sizes for surfaces and verts
+	if ( cm_isQ3Bsp ) {
+		surfSize = sizeof( q3dsurface_t );
+		vertSize = sizeof( q3drawVert_t );
+	} else {
+		surfSize = sizeof( dsurface_t );
+		vertSize = sizeof( mapVert_t );
+	}
+
+	if (surfs->filelen % surfSize)
 		Com_Error (ERR_DROP, "MOD_LoadBmodel: funny lump size");
-	cm.numSurfaces = count = surfs->filelen / sizeof(*in);
+	cm.numSurfaces = count = surfs->filelen / surfSize;
 	cm.surfaces = (cPatch_t **) Z_Malloc( cm.numSurfaces * sizeof( cm.surfaces[0] ), TAG_BSP, qtrue );
 
-	dv = (mapVert_t *)(cmod_base + verts->fileofs);
-	if (verts->filelen % sizeof(*dv))
+	if (verts->filelen % vertSize)
 		Com_Error (ERR_DROP, "MOD_LoadBmodel: funny lump size");
+
+	byte *surfData = (byte *)(cmod_base + surfs->fileofs);
+	byte *vertData = (byte *)(cmod_base + verts->fileofs);
 
 	// scan through all the surfaces, but only load patches,
 	// not planar faces
-	for ( i = 0 ; i < count ; i++, in++ ) {
-		if ( LittleLong( in->surfaceType ) != MST_PATCH ) {
+	for ( i = 0 ; i < count ; i++, surfData += surfSize ) {
+		int surfaceType, firstVert;
+
+		if ( cm_isQ3Bsp ) {
+			q3dsurface_t *q3in = (q3dsurface_t *)surfData;
+			surfaceType = LittleLong( q3in->surfaceType );
+			shaderNum = LittleLong( q3in->shaderNum );
+			firstVert = LittleLong( q3in->firstVert );
+			width = LittleLong( q3in->patchWidth );
+			height = LittleLong( q3in->patchHeight );
+		} else {
+			dsurface_t *in = (dsurface_t *)surfData;
+			surfaceType = LittleLong( in->surfaceType );
+			shaderNum = LittleLong( in->shaderNum );
+			firstVert = LittleLong( in->firstVert );
+			width = LittleLong( in->patchWidth );
+			height = LittleLong( in->patchHeight );
+		}
+
+		if ( surfaceType != MST_PATCH ) {
 			continue;		// ignore other surfaces
 		}
-		// FIXME: check for non-colliding patches
 
 		cm.surfaces[ i ] = patch = (cPatch_t *) Z_Malloc( sizeof( *patch ), TAG_BSP, qtrue );
 
-		// load the full drawverts onto the stack
-		width = LittleLong( in->patchWidth );
-		height = LittleLong( in->patchHeight );
 		c = width * height;
 		if ( c > MAX_PATCH_VERTS ) {
 			Com_Error( ERR_DROP, "ParseMesh: MAX_PATCH_VERTS" );
 		}
 
-		dv_p = dv + LittleLong( in->firstVert );
-		for ( j = 0 ; j < c ; j++, dv_p++ ) {
-			points[j][0] = LittleFloat( dv_p->xyz[0] );
-			points[j][1] = LittleFloat( dv_p->xyz[1] );
-			points[j][2] = LittleFloat( dv_p->xyz[2] );
+		// load the full drawverts onto the stack
+		for ( j = 0 ; j < c ; j++ ) {
+			if ( cm_isQ3Bsp ) {
+				q3drawVert_t *dv_p = (q3drawVert_t *)(vertData + (firstVert + j) * vertSize);
+				points[j][0] = LittleFloat( dv_p->xyz[0] );
+				points[j][1] = LittleFloat( dv_p->xyz[1] );
+				points[j][2] = LittleFloat( dv_p->xyz[2] );
+			} else {
+				mapVert_t *dv_p = (mapVert_t *)(vertData + (firstVert + j) * vertSize);
+				points[j][0] = LittleFloat( dv_p->xyz[0] );
+				points[j][1] = LittleFloat( dv_p->xyz[1] );
+				points[j][2] = LittleFloat( dv_p->xyz[2] );
+			}
 		}
 
-		shaderNum = LittleLong( in->shaderNum );
 		patch->contents = cm.shaders[shaderNum].contentFlags;
 		CM_OrOfAllContentsFlagsInMap |= patch->contents;
 
@@ -757,11 +805,21 @@ static void CM_LoadMap_Actual( const char *name, qboolean clientload, int *check
 		last_checksum = LittleLong (Com_BlockChecksum (buf, iBSPLen));
 
 		header = *(dheader_t *)buf;
-		for (i=0 ; i<sizeof(dheader_t)/4 ; i++) {
+
+		// Detect Q3/EF BSP (version 46) vs JKA BSP (version 1).
+		// Q3 has 17 lumps, JKA has 18. Read only what's safe.
+		{
+			int rawVersion = LittleLong( ((int *)buf)[1] );
+			cm_isQ3Bsp = ( rawVersion == Q3_BSP_VERSION ) ? qtrue : qfalse;
+		}
+		int headerInts = cm_isQ3Bsp
+			? (2 + Q3_HEADER_LUMPS * 2) // ident + version + 17 lumps * (ofs,len)
+			: (int)(sizeof(dheader_t) / 4);
+		for (i=0 ; i<headerInts ; i++) {
 			((int *)&header)[i] = LittleLong ( ((int *)&header)[i]);
 		}
 
-		if ( header.version != BSP_VERSION )
+		if ( header.version != BSP_VERSION && header.version != Q3_BSP_VERSION )
 		{
 			Z_Free(	gpvCachedMapDiskImage);
 					gpvCachedMapDiskImage = NULL;
@@ -912,7 +970,13 @@ cmodel_t	*CM_ClipHandleToModel( clipHandle_t handle, clipMap_t **clipMap )
 
 	if ( handle < 0 )
 	{
+#ifdef EF_MODE
+		// EF entities may have uninitialized brush model handles -- return box model as fallback
+		Com_Printf( S_COLOR_YELLOW "CM_ClipHandleToModel: bad handle %i, using box model\n", handle );
+		return &cmg.cmodels[BOX_MODEL_HANDLE];
+#else
 		Com_Error( ERR_DROP, "CM_ClipHandleToModel: bad handle %i", handle );
+#endif
 	}
 	if ( handle < cmg.numSubModels )
 	{
@@ -945,6 +1009,11 @@ cmodel_t	*CM_ClipHandleToModel( clipHandle_t handle, clipMap_t **clipMap )
 		count += SubBSP[i].numSubModels;
 	}
 
+#ifdef EF_MODE
+	// EF: entity may have garbage modelindex during init. Return box model as safe fallback.
+	Com_Printf( S_COLOR_YELLOW "CM_ClipHandleToModel: bad handle %i (numSubModels=%i), using box\n", handle, cmg.numSubModels );
+	return &box_model;
+#else
 	if ( handle < MAX_SUBMODELS )
 	{
 		Com_Error( ERR_DROP, "CM_ClipHandleToModel: bad handle %i < %i < %i",
@@ -953,6 +1022,7 @@ cmodel_t	*CM_ClipHandleToModel( clipHandle_t handle, clipMap_t **clipMap )
 	Com_Error( ERR_DROP, "CM_ClipHandleToModel: bad handle %i", handle + MAX_SUBMODELS );
 
 	return NULL;
+#endif
 }
 
 /*

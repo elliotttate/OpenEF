@@ -1018,10 +1018,10 @@ DLL glue, but highly reusuable DLL glue at that
 
 const char *String_GetStringValue( const char *reference )
 {
-#ifndef JK2_MODE
-	return SE_GetString(reference);
-#else
+#if defined(JK2_MODE)
 	return JK2SP_GetStringTextString(reference);
+#else
+	return SE_GetString(reference);
 #endif
 }
 
@@ -1075,7 +1075,9 @@ static CMiniHeap *GetG2VertSpaceServer( void ) {
 }
 
 // NOTENOTE: If you change the output name of rd-vanilla, change this define too!
-#ifdef JK2_MODE
+#if defined(EF_MODE)
+#define DEFAULT_RENDER_LIBRARY	"rdsp-vanilla"
+#elif defined(JK2_COMPAT_MODE)
 #define DEFAULT_RENDER_LIBRARY	"rdjosp-vanilla"
 #else
 #define DEFAULT_RENDER_LIBRARY	"rdsp-vanilla"
@@ -1216,7 +1218,7 @@ CL_Init
 void CL_Init( void ) {
 	Com_Printf( "----- Client Initialization -----\n" );
 
-#ifdef JK2_MODE
+#if defined(JK2_MODE)
 	JK2SP_Register("con_text", SP_REGISTER_REQUIRED);	//reference is CON_TEXT
 	JK2SP_Register("keynames", SP_REGISTER_REQUIRED);	// reference is KEYNAMES
 #endif
@@ -1284,13 +1286,15 @@ void CL_Init( void ) {
 	cl_consoleShiftRequirement = Cvar_Get( "cl_consoleShiftRequirement", "0", CVAR_ARCHIVE );
 
 	// userinfo
-#ifdef JK2_MODE
+#if defined(EF_MODE)
+	Cvar_Get ("name", "Munro", CVAR_USERINFO | CVAR_ARCHIVE_ND );
+#elif defined(JK2_COMPAT_MODE)
 	Cvar_Get ("name", "Kyle", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 #else
 	Cvar_Get ("name", "Jaden", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 #endif
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	// this is required for savegame compatibility - not ever actually used
 	Cvar_Get ("snaps", "20", CVAR_USERINFO );
 	Cvar_Get ("sex", "male", CVAR_USERINFO | CVAR_ARCHIVE );

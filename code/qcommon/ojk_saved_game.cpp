@@ -241,14 +241,14 @@ bool SavedGame::read_chunk(
 
 	uint32_t loaded_checksum = 0;
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	// Get checksum...
 	//
 	loaded_chunk_size += ::FS_Read(
 		&loaded_checksum,
 		static_cast<int>(sizeof(loaded_checksum)),
 		file_handle_);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 	// Load in data and magic number...
 	//
@@ -287,7 +287,7 @@ bool SavedGame::read_chunk(
 			file_handle_);
 	}
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	uint32_t loaded_magic_value = 0;
 
 	loaded_chunk_size += ::FS_Read(
@@ -311,7 +311,7 @@ bool SavedGame::read_chunk(
 		&loaded_checksum,
 		static_cast<int>(sizeof(loaded_checksum)),
 		file_handle_);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 	// Make sure the checksums match...
 	//
@@ -337,7 +337,7 @@ bool SavedGame::read_chunk(
 		(is_compressed ? sizeof(compressed_size) : 0) +
 		(is_compressed ? compressed_size : io_buffer_.size());
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	ref_chunk_size += sizeof(loaded_magic_value);
 #endif
 
@@ -432,9 +432,9 @@ bool SavedGame::write_chunk(
 		}
 	}
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	const uint32_t magic_value = get_jo_magic_value();
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 	if (compressed_size > 0)
 	{
@@ -445,12 +445,12 @@ bool SavedGame::write_chunk(
 			static_cast<int>(sizeof(size)),
 			file_handle_);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_chunk_size += ::FS_Write(
 			&checksum,
 			static_cast<int>(sizeof(checksum)),
 			file_handle_);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		saved_chunk_size += ::FS_Write(
 			&compressed_size,
@@ -462,7 +462,7 @@ bool SavedGame::write_chunk(
 			compressed_size,
 			file_handle_);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_chunk_size += ::FS_Write(
 			&magic_value,
 			static_cast<int>(sizeof(magic_value)),
@@ -472,7 +472,7 @@ bool SavedGame::write_chunk(
 			&checksum,
 			static_cast<int>(sizeof(checksum)),
 			file_handle_);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		std::size_t ref_chunk_size =
 			sizeof(chunk_id) +
@@ -481,9 +481,9 @@ bool SavedGame::write_chunk(
 			sizeof(compressed_size) +
 			compressed_size;
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		ref_chunk_size += sizeof(magic_value);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		if (saved_chunk_size != ref_chunk_size)
 		{
@@ -508,19 +508,19 @@ bool SavedGame::write_chunk(
 			static_cast<int>(sizeof(size)),
 			file_handle_);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_chunk_size += ::FS_Write(
 			&checksum,
 			static_cast<int>(sizeof(checksum)),
 			file_handle_);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		saved_chunk_size += ::FS_Write(
 			io_buffer_.data(),
 			size,
 			file_handle_);
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		saved_chunk_size += ::FS_Write(
 			&magic_value,
 			static_cast<int>(sizeof(magic_value)),
@@ -530,7 +530,7 @@ bool SavedGame::write_chunk(
 			&checksum,
 			static_cast<int>(sizeof(checksum)),
 			file_handle_);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		std::size_t ref_chunk_size =
 			sizeof(chunk_id) +
@@ -538,9 +538,9 @@ bool SavedGame::write_chunk(
 			sizeof(checksum) +
 			size;
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 		ref_chunk_size += sizeof(magic_value);
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 		if (saved_chunk_size != ref_chunk_size)
 		{

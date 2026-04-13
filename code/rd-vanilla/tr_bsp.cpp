@@ -28,6 +28,10 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #include "tr_common.h"
 #include "tr_local.h"
+#include "../qcommon/qfiles_q3bsp.h"
+
+// Set to true when loading a Q3/EF BSP (version 46) vs JKA BSP (version 1)
+static qboolean tr_isQ3Bsp = qfalse;
 
 /*
 
@@ -1406,22 +1410,228 @@ void RE_LoadWorldMap_Actual( const char *name, world_t &worldData, int index ) {
 
 	header->version = LittleLong (header->version);
 
-	if ( header->version != BSP_VERSION )
+	tr_isQ3Bsp = ( header->version == Q3_BSP_VERSION ) ? qtrue : qfalse;
+
+	if ( header->version != BSP_VERSION && header->version != Q3_BSP_VERSION )
 	{
 		Com_Error (ERR_DROP, "RE_LoadWorldMap: %s has wrong version number (%i should be %i)", name, header->version, BSP_VERSION);
 	}
 
-	// swap all the lumps
-	for (size_t i=0 ; i<sizeof(dheader_t)/4 ; i++) {
+	// swap all the lumps -- Q3 has 17 lumps, JKA has 18
+	int headerInts = tr_isQ3Bsp
+		? (2 + Q3_HEADER_LUMPS * 2)
+		: (int)(sizeof(dheader_t) / 4);
+	for (int i=0 ; i<headerInts ; i++) {
 		((int *)header)[i] = LittleLong ( ((int *)header)[i]);
+	}
+
+	// Q3/EF BSP conversion: expand lumps from Q3 format to JKA format in new buffers
+	// so that all existing R_Load* functions work without modification.
+	byte *convertedVerts = NULL;
+	byte *convertedSurfs = NULL;
+	byte *convertedSides = NULL;
+	byte *convertedGrid = NULL;
+	lump_t q3VertLump = {0}, q3SurfLump = {0}, q3SideLump = {0}, q3GridLump = {0};
+
+	if ( tr_isQ3Bsp ) {
+		// Convert drawverts: q3drawVert_t (44B) -> drawVert_t (80B)
+		{
+			lump_t *l = &header->lumps[LUMP_DRAWVERTS];
+			int q3count = l->filelen / sizeof(q3drawVert_t);
+			convertedVerts = (byte *)R_Malloc( q3count * sizeof(drawVert_t), TAG_BSP, qtrue );
+			q3drawVert_t *src = (q3drawVert_t *)(fileBase + l->fileofs);
+			drawVert_t *dst = (drawVert_t *)convertedVerts;
+			for (int i = 0; i < q3count; i++) {
+				VectorCopy(src[i].xyz, dst[i].xyz);
+				dst[i].st[0] = src[i].st[0];
+				dst[i].st[1] = src[i].st[1];
+				dst[i].lightmap[0][0] = src[i].lightmap[0];
+				dst[i].lightmap[0][1] = src[i].lightmap[1];
+				for (int j = 1; j < MAXLIGHTMAPS; j++) {
+					dst[i].lightmap[j][0] = 0;
+					dst[i].lightmap[j][1] = 0;
+				}
+				VectorCopy(src[i].normal, dst[i].normal);
+				dst[i].color[0][0] = src[i].color[0];
+				dst[i].color[0][1] = src[i].color[1];
+				dst[i].color[0][2] = src[i].color[2];
+				dst[i].color[0][3] = src[i].color[3];
+				for (int j = 1; j < MAXLIGHTMAPS; j++) {
+					dst[i].color[j][0] = 255;
+					dst[i].color[j][1] = 255;
+					dst[i].color[j][2] = 255;
+					dst[i].color[j][3] = 255;
+				}
+			}
+			q3VertLump.fileofs = 0; // points into convertedVerts
+			q3VertLump.filelen = q3count * sizeof(drawVert_t);
+		}
+
+		// Convert surfaces: q3dsurface_t (68B) -> dsurface_t (160B)
+		{
+			lump_t *l = &header->lumps[LUMP_SURFACES];
+			int q3count = l->filelen / sizeof(q3dsurface_t);
+			convertedSurfs = (byte *)R_Malloc( q3count * sizeof(dsurface_t), TAG_BSP, qtrue );
+			q3dsurface_t *src = (q3dsurface_t *)(fileBase + l->fileofs);
+			dsurface_t *dst = (dsurface_t *)convertedSurfs;
+			for (int i = 0; i < q3count; i++) {
+				dst[i].shaderNum = src[i].shaderNum;
+				dst[i].fogNum = src[i].fogNum;
+				dst[i].surfaceType = src[i].surfaceType;
+				dst[i].firstVert = src[i].firstVert;
+				dst[i].numVerts = src[i].numVerts;
+				dst[i].firstIndex = src[i].firstIndex;
+				dst[i].numIndexes = src[i].numIndexes;
+				dst[i].lightmapStyles[0] = LS_NORMAL;
+				dst[i].vertexStyles[0] = LS_NORMAL;
+				for (int j = 1; j < MAXLIGHTMAPS; j++) {
+					dst[i].lightmapStyles[j] = LS_NONE;
+					dst[i].vertexStyles[j] = LS_NONE;
+				}
+				dst[i].lightmapNum[0] = src[i].lightmapNum;
+				for (int j = 1; j < MAXLIGHTMAPS; j++)
+					dst[i].lightmapNum[j] = -1;
+				dst[i].lightmapX[0] = src[i].lightmapX;
+				dst[i].lightmapY[0] = src[i].lightmapY;
+				for (int j = 1; j < MAXLIGHTMAPS; j++) {
+					dst[i].lightmapX[j] = 0;
+					dst[i].lightmapY[j] = 0;
+				}
+				dst[i].lightmapWidth = src[i].lightmapWidth;
+				dst[i].lightmapHeight = src[i].lightmapHeight;
+				VectorCopy(src[i].lightmapOrigin, dst[i].lightmapOrigin);
+				for (int j = 0; j < 3; j++)
+					VectorCopy(src[i].lightmapVecs[j], dst[i].lightmapVecs[j]);
+				dst[i].patchWidth = src[i].patchWidth;
+				dst[i].patchHeight = src[i].patchHeight;
+			}
+			q3SurfLump.fileofs = 0;
+			q3SurfLump.filelen = q3count * sizeof(dsurface_t);
+		}
+
+		// Convert brushsides: q3dbrushside_t (8B) -> dbrushside_t (12B)
+		{
+			lump_t *l = &header->lumps[LUMP_BRUSHSIDES];
+			int q3count = l->filelen / sizeof(q3dbrushside_t);
+			convertedSides = (byte *)R_Malloc( q3count * sizeof(dbrushside_t), TAG_BSP, qtrue );
+			q3dbrushside_t *src = (q3dbrushside_t *)(fileBase + l->fileofs);
+			dbrushside_t *dst = (dbrushside_t *)convertedSides;
+			for (int i = 0; i < q3count; i++) {
+				dst[i].planeNum = src[i].planeNum;
+				dst[i].shaderNum = src[i].shaderNum;
+				dst[i].drawSurfNum = 0;
+			}
+			q3SideLump.fileofs = 0;
+			q3SideLump.filelen = q3count * sizeof(dbrushside_t);
+		}
+
+		// Convert lightgrid: q3dgrid_t (8B) -> dgrid_t (30B)
+		{
+			lump_t *l = &header->lumps[LUMP_LIGHTGRID];
+			int q3count = l->filelen / sizeof(q3dgrid_t);
+			convertedGrid = (byte *)R_Malloc( q3count * sizeof(dgrid_t), TAG_BSP, qtrue );
+			q3dgrid_t *src = (q3dgrid_t *)(fileBase + l->fileofs);
+			dgrid_t *dst = (dgrid_t *)convertedGrid;
+			for (int i = 0; i < q3count; i++) {
+				dst[i].ambientLight[0][0] = src[i].ambientLight[0];
+				dst[i].ambientLight[0][1] = src[i].ambientLight[1];
+				dst[i].ambientLight[0][2] = src[i].ambientLight[2];
+				dst[i].directLight[0][0] = src[i].directLight[0];
+				dst[i].directLight[0][1] = src[i].directLight[1];
+				dst[i].directLight[0][2] = src[i].directLight[2];
+				for (int j = 1; j < MAXLIGHTMAPS; j++) {
+					dst[i].ambientLight[j][0] = dst[i].ambientLight[j][1] = dst[i].ambientLight[j][2] = 0;
+					dst[i].directLight[j][0] = dst[i].directLight[j][1] = dst[i].directLight[j][2] = 0;
+				}
+				dst[i].styles[0] = LS_NORMAL;
+				for (int j = 1; j < MAXLIGHTMAPS; j++)
+					dst[i].styles[j] = LS_NONE;
+				dst[i].latLong[0] = src[i].latLong[0];
+				dst[i].latLong[1] = src[i].latLong[1];
+			}
+			q3GridLump.fileofs = 0;
+			q3GridLump.filelen = q3count * sizeof(dgrid_t);
+		}
+
+		// Redirect lump pointers to converted data by patching fileBase temporarily
+		// We need to use fake lump_t entries pointing into our converted buffers
+	}
+
+	// For Q3 BSP, use converted data; for JKA BSP, use original lumps
+	byte *vertBase = tr_isQ3Bsp ? convertedVerts : fileBase;
+	byte *surfBase = tr_isQ3Bsp ? convertedSurfs : fileBase;
+	byte *sideBase = tr_isQ3Bsp ? convertedSides : fileBase;
+	byte *gridBase = tr_isQ3Bsp ? convertedGrid : fileBase;
+	lump_t &vertLump = tr_isQ3Bsp ? q3VertLump : header->lumps[LUMP_DRAWVERTS];
+	lump_t &surfLump = tr_isQ3Bsp ? q3SurfLump : header->lumps[LUMP_SURFACES];
+	lump_t &sideLump = tr_isQ3Bsp ? q3SideLump : header->lumps[LUMP_BRUSHSIDES];
+	lump_t &gridLump = tr_isQ3Bsp ? q3GridLump : header->lumps[LUMP_LIGHTGRID];
+
+	// Temporarily swap fileBase for converted data during loading
+	byte *origFileBase = fileBase;
+	if ( tr_isQ3Bsp ) {
+		// R_LoadSurfaces needs verts and surfs from converted data.
+		// We'll handle this by temporarily pointing fileBase at the converted buffers.
+		// However, R_LoadSurfaces reads from fileBase + lump.fileofs, so with fileofs=0
+		// and fileBase=convertedBuffer, it reads the right data.
 	}
 
 	// load into heap
 	R_LoadShaders( &header->lumps[LUMP_SHADERS], worldData );
 	R_LoadLightmaps( &header->lumps[LUMP_LIGHTMAPS], name, worldData );
 	R_LoadPlanes (&header->lumps[LUMP_PLANES], worldData);
-	R_LoadFogs( &header->lumps[LUMP_FOGS], &header->lumps[LUMP_BRUSHES], &header->lumps[LUMP_BRUSHSIDES], worldData, index );
-	R_LoadSurfaces( &header->lumps[LUMP_SURFACES], &header->lumps[LUMP_DRAWVERTS], &header->lumps[LUMP_DRAWINDEXES], worldData, index );
+
+	// Fogs uses brushsides -- use converted for Q3
+	if ( tr_isQ3Bsp ) fileBase = sideBase;
+	R_LoadFogs( &header->lumps[LUMP_FOGS], &header->lumps[LUMP_BRUSHES], &sideLump, worldData, index );
+	if ( tr_isQ3Bsp ) fileBase = origFileBase;
+
+	// Surfaces uses surfs + verts -- these need special handling since they reference different bases
+	if ( tr_isQ3Bsp ) {
+		// R_LoadSurfaces reads from fileBase + surfs->fileofs and fileBase + verts->fileofs
+		// We need to make it read from our converted buffers instead.
+		// Simplest: temporarily make fileBase point to a dummy, and have lumps point to our buffers.
+		// But R_LoadSurfaces also reads indexes from original fileBase.
+		// Solution: Patch the lump offsets to point into original data for indexes,
+		// and into converted data for verts/surfs.
+		// This is getting complex -- let's just copy the index data adjacent to surfs.
+		// Actually, indexes are just int arrays which don't differ between Q3 and JKA.
+		// So we can keep fileBase for indexes and use our converted lump for surfs/verts.
+
+		// Since R_LoadSurfaces reads all three from fileBase, and our converted data
+		// already uses fileofs=0, we need to call it three times with different bases...
+		// OR we can patch the original BSP data in-place.
+
+		// Simplest approach: memcpy converted data back over the original BSP buffer
+		// at the original offsets. Since our converted data is LARGER, we can't do this.
+
+		// OK -- the right solution is to modify R_LoadSurfaces to accept separate pointers.
+		// But that's a big refactor. Let me just use converted lumps with a wrapper.
+
+		// Practical approach: allocate a mega-buffer that holds surfs, verts, and indexes
+		// contiguously, then point fileBase at it with correct offsets.
+		lump_t *idxLump = &header->lumps[LUMP_DRAWINDEXES];
+		int megaSize = q3SurfLump.filelen + q3VertLump.filelen + idxLump->filelen;
+		byte *mega = (byte *)R_Malloc( megaSize, TAG_BSP, qfalse );
+		int surfOff = 0;
+		int vertOff = q3SurfLump.filelen;
+		int idxOff  = q3SurfLump.filelen + q3VertLump.filelen;
+		memcpy( mega + surfOff, convertedSurfs, q3SurfLump.filelen );
+		memcpy( mega + vertOff, convertedVerts, q3VertLump.filelen );
+		memcpy( mega + idxOff,  origFileBase + idxLump->fileofs, idxLump->filelen );
+
+		lump_t megaSurfLump = { surfOff, q3SurfLump.filelen };
+		lump_t megaVertLump = { vertOff, q3VertLump.filelen };
+		lump_t megaIdxLump  = { idxOff,  idxLump->filelen };
+
+		fileBase = mega;
+		R_LoadSurfaces( &megaSurfLump, &megaVertLump, &megaIdxLump, worldData, index );
+		fileBase = origFileBase;
+		R_Free( mega );
+	} else {
+		R_LoadSurfaces( &header->lumps[LUMP_SURFACES], &header->lumps[LUMP_DRAWVERTS], &header->lumps[LUMP_DRAWINDEXES], worldData, index );
+	}
+
 	R_LoadMarksurfaces (&header->lumps[LUMP_LEAFSURFACES], worldData);
 	R_LoadNodesAndLeafs (&header->lumps[LUMP_NODES], &header->lumps[LUMP_LEAFS], worldData);
 	R_LoadSubmodels (&header->lumps[LUMP_MODELS], worldData, index);
@@ -1430,13 +1640,27 @@ void RE_LoadWorldMap_Actual( const char *name, world_t &worldData, int index ) {
 	if (!index)
 	{
 		R_LoadEntities( &header->lumps[LUMP_ENTITIES], worldData );
-		R_LoadLightGrid( &header->lumps[LUMP_LIGHTGRID], worldData );
-		R_LoadLightGridArray( &header->lumps[LUMP_LIGHTARRAY], worldData );
+		if ( tr_isQ3Bsp ) {
+			fileBase = gridBase;
+			R_LoadLightGrid( &q3GridLump, worldData );
+			fileBase = origFileBase;
+		} else {
+			R_LoadLightGrid( &header->lumps[LUMP_LIGHTGRID], worldData );
+		}
+		if ( !tr_isQ3Bsp ) {
+			R_LoadLightGridArray( &header->lumps[LUMP_LIGHTARRAY], worldData );
+		}
 
 		// only set tr.world now that we know the entire level has loaded properly
 		tr.world = &worldData;
 	}
 
+
+	// Free Q3 BSP conversion buffers
+	if ( convertedVerts ) R_Free( convertedVerts );
+	if ( convertedSurfs ) R_Free( convertedSurfs );
+	if ( convertedSides ) R_Free( convertedSides );
+	if ( convertedGrid )  R_Free( convertedGrid );
 
 	if (ri.gpvCachedMapDiskImage() && !loadedSubBSP)
 	{

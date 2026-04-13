@@ -83,11 +83,11 @@ static void IN_UseGivenForce(void)
 	}
 
 	switch(forceNum) {
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	case FP_DRAIN:
 		genCmdNum = GENCMD_FORCE_DRAIN;
 		break;
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 	case FP_PUSH:
 		genCmdNum = GENCMD_FORCE_THROW;
@@ -108,7 +108,7 @@ static void IN_UseGivenForce(void)
 		genCmdNum = GENCMD_FORCE_LIGHTNING;
 		break;
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	case FP_RAGE:
 		genCmdNum = GENCMD_FORCE_RAGE;
 		break;
@@ -121,7 +121,7 @@ static void IN_UseGivenForce(void)
 	case FP_SEE:
 		genCmdNum = GENCMD_FORCE_SEEING;
 		break;
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 
 	case FP_HEAL:
 		genCmdNum = GENCMD_FORCE_HEAL;
@@ -972,7 +972,7 @@ void CL_InitInput( void ) {
 	Cmd_AddCommand ("-force_lightning", IN_Button1Up);
 	Cmd_AddCommand ("+useforce", IN_Button2Down);	//use current force power
 	Cmd_AddCommand ("-useforce", IN_Button2Up);
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 	Cmd_AddCommand ("+block", IN_Button3Down);//manual blocking
 	Cmd_AddCommand ("-block", IN_Button3Up);
 #else
@@ -987,7 +987,7 @@ void CL_InitInput( void ) {
 	Cmd_AddCommand ("-force_grip", IN_Button6Up);
 	Cmd_AddCommand ("+altattack", IN_Button7Down);//altattack
 	Cmd_AddCommand ("-altattack", IN_Button7Up);
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 	Cmd_AddCommand ("+forcefocus", IN_Button8Down);//special saber attacks
 	Cmd_AddCommand ("-forcefocus", IN_Button8Up);
 	Cmd_AddCommand ("+block", IN_Button8Down);//manual blocking

@@ -1646,14 +1646,20 @@ static void UI_CalcForceStatus(void)
 	memset(value, 0, sizeof(value));
 
 	lightSide = pState->forcePowerLevel[FP_HEAL] +
-		pState->forcePowerLevel[FP_TELEPATHY] +
-		pState->forcePowerLevel[FP_PROTECT] +
-		pState->forcePowerLevel[FP_ABSORB];
+		pState->forcePowerLevel[FP_TELEPATHY]
+#ifndef JK2_COMPAT_MODE
+		+ pState->forcePowerLevel[FP_PROTECT]
+		+ pState->forcePowerLevel[FP_ABSORB]
+#endif
+		;
 
 	darkSide = pState->forcePowerLevel[FP_GRIP] +
-		pState->forcePowerLevel[FP_LIGHTNING] +
-		pState->forcePowerLevel[FP_RAGE] +
-		pState->forcePowerLevel[FP_DRAIN];
+		pState->forcePowerLevel[FP_LIGHTNING]
+#ifndef JK2_COMPAT_MODE
+		+ pState->forcePowerLevel[FP_RAGE]
+		+ pState->forcePowerLevel[FP_DRAIN]
+#endif
+		;
 
 	total = lightSide + darkSide;
 
@@ -4391,6 +4397,7 @@ static void UI_UpdateFightingStyleChoices ( void )
 			pState = cl->gentity->client;
 
 
+#ifndef JK2_COMPAT_MODE
 			// Knows Fast style?
 			if (pState->saberStylesKnown & (1<<SS_FAST))
 			{
@@ -4436,12 +4443,13 @@ static void UI_UpdateFightingStyleChoices ( void )
 					Cvar_Set ( "ui_newfightingstyle", "1" );		// MEDIUM
 				}
 			}
-			else		// They have nothing, which should not happen
+#else // JK2_COMPAT_MODE - no saber styles, provide defaults
 			{
 				Cvar_Set ( "ui_currentfightingstyle", "1" );		// Default MEDIUM
-				Cvar_Set ( "ui_newfightingstyle", "0" );			// FAST??
-				Cvar_Set ( "ui_fightingstylesallowed", "0" );		// Default to no new styles allowed
+				Cvar_Set ( "ui_newfightingstyle", "0" );			// FAST
+				Cvar_Set ( "ui_fightingstylesallowed", "0" );		// No new styles
 			}
+#endif // !JK2_COMPAT_MODE
 
 			// Determine current style
 			if (pState->saberAnimLevel == SS_FAST)
@@ -5381,7 +5389,9 @@ static void UI_UpdateFightingStyle ( void )
 	if (cl && cl->gentity && cl->gentity->client)
 	{
 		pState = cl->gentity->client;
+#ifndef JK2_COMPAT_MODE
 		pState->saberStylesKnown |= (1<<saberStyle);
+#endif
 	}
 	else	// Must be at the beginning of the game so the client hasn't been created, shove data in a cvar
 	{

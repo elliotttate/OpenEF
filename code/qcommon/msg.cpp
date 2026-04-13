@@ -954,11 +954,11 @@ static const netField_t	playerStateFields[] =
 { PSF(pm_type), 8 },
 { PSF(bobCycle), 8 },
 
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 { PSF(pm_flags), 17 },
 #else
 { PSF(pm_flags), 32 },
-#endif // JK2_MODE
+#endif // JK2_COMPAT_MODE
 
 { PSF(pm_time), -16 },
 { PSF(origin[0]), 0 },
@@ -1001,7 +1001,7 @@ static const netField_t	playerStateFields[] =
 { PSF(damageYaw), 8 },
 { PSF(damagePitch), -8 },
 { PSF(damageCount), 8 },
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 { PSF(saberColor), 8 },
 { PSF(saberActive), 8 },
 { PSF(saberLength), 32 },
@@ -1009,7 +1009,7 @@ static const netField_t	playerStateFields[] =
 #endif
 { PSF(forcePowersActive), 32},
 { PSF(saberInFlight), 8 },
-#ifdef JK2_MODE
+#ifdef JK2_COMPAT_MODE
 { PSF(vehicleModel), 32 },
 #endif
 
@@ -1024,9 +1024,9 @@ static const netField_t	playerStateFields[] =
 { PSF(serverViewOrg[1]), 0 },
 { PSF(serverViewOrg[2]), 0 },
 
-#ifndef JK2_MODE
+#ifndef JK2_COMPAT_MODE
 { PSF(forceRageRecoveryTime), 32 },
-#endif // !JK2_MODE
+#endif // !JK2_COMPAT_MODE
 };
 
 /*
