@@ -26,7 +26,14 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 // leave this as first line for PCH reasons...
 //
 #include "../server/exe_headers.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "../ui/ui_shared.h"
+
+#ifdef EF_MODE
+static int ef_cg_lastSyscall = -1;
+#endif
 
 #include "client.h"
 #include "vmachine.h"
@@ -816,6 +823,14 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 #endif
 	// EF_MODE: EF uses the same syscall enum layout as JKA for basic calls,
 	// no conversion needed (EF-specific syscalls will be handled individually)
+#ifdef EF_MODE
+	ef_cg_lastSyscall = args[0];
+	if ( args[0] != CG_PRINT && args[0] != CG_CVAR_REGISTER && args[0] != CG_CVAR_SET
+		&& args[0] != CG_R_REGISTERSHADER && args[0] != CG_R_REGISTERSHADERNOMIP
+		&& args[0] != CG_R_REGISTERMODEL && args[0] != CG_S_REGISTERSOUND ) {
+		Com_DPrintf("CG syscall: %d\n", args[0]);
+	}
+#endif
 	switch( args[0] ) {
 	case CG_PRINT:
 		Com_Printf( "%s", VMA(1) );
@@ -1412,7 +1427,17 @@ void CL_InitCGame( void ) {
 	cls.state = CA_LOADING;
 
 	// init for this gamestate
+	Com_Printf("CL: Calling CG_INIT...\n");
+#if defined(EF_MODE) && defined(_WIN32)
+	__try {
+#endif
 	VM_Call( CG_INIT, clc.serverCommandSequence );
+#if defined(EF_MODE) && defined(_WIN32)
+	} __except(EXCEPTION_EXECUTE_HANDLER) {
+		Com_Printf(S_COLOR_RED "*** CRASH in CG_INIT (exception 0x%08X, last syscall=%d) ***\n", GetExceptionCode(), ef_cg_lastSyscall);
+	}
+#endif
+	Com_Printf("CL: CG_INIT returned\n");
 
 	// reset any CVAR_CHEAT cvars registered by cgame
 	if ( !cl_connectedToCheatServer )
